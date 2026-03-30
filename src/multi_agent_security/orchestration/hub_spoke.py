@@ -1,5 +1,5 @@
-from src.orchestration.base import BaseOrchestrator
-from src.types import TaskState
+from multi_agent_security.orchestration.base import BaseOrchestrator
+from multi_agent_security.types import TaskState
 
 
 class HubSpokeOrchestrator(BaseOrchestrator):

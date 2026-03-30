@@ -7,7 +7,7 @@ import anthropic
 from pydantic import BaseModel
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from src.config import LLMConfig
+from multi_agent_security.config import LLMConfig
 
 # Pricing constants per million tokens.
 # Bedrock pricing mirrors Anthropic list price for Claude Sonnet;

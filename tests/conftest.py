@@ -1,9 +1,9 @@
 import pytest
 from datetime import datetime, timezone
 
-from src.config import AppConfig, LLMConfig
-from src.llm_client import LLMClient
-from src.types import (
+from multi_agent_security.config import AppConfig, LLMConfig
+from multi_agent_security.llm_client import LLMClient
+from multi_agent_security.types import (
     AgentMessage,
     FixStrategy,
     TaskState,
@@ -46,7 +46,7 @@ def app_config(tmp_path) -> AppConfig:
         pathlib.Path(__file__).parent.parent / "config" / "default.yaml",
         config_path,
     )
-    from src.config import load_config
+    from multi_agent_security.config import load_config
     return load_config(str(config_path))
 
 

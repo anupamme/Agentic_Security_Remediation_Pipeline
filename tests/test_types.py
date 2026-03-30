@@ -2,7 +2,7 @@ import pytest
 from datetime import datetime, timezone
 from pydantic import ValidationError
 
-from src.types import (
+from multi_agent_security.types import (
     AgentMessage,
     BenchmarkExample,
     EvalResult,

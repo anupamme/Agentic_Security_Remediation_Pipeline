@@ -1,7 +1,7 @@
 from typing import Optional
 
-from src.memory.base import BaseMemory
-from src.types import AgentMessage
+from multi_agent_security.memory.base import BaseMemory
+from multi_agent_security.types import AgentMessage
 
 
 class RetrievalMemory(BaseMemory):

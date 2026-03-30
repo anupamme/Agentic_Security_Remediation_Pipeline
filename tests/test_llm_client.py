@@ -1,8 +1,8 @@
 import pytest
 from pydantic import BaseModel
 
-from src.llm_client import LLMClient, LLMResponse, _compute_cost
-from src.config import LLMConfig
+from multi_agent_security.llm_client import LLMClient, LLMResponse, _compute_cost
+from multi_agent_security.config import LLMConfig
 
 
 @pytest.fixture

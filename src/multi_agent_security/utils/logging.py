@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from src.types import AgentMessage
+from multi_agent_security.types import AgentMessage
 
 
 class _JsonFormatter(logging.Formatter):

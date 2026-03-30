@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-from src.types import AgentMessage
+from multi_agent_security.types import AgentMessage
 
 
 class CostTracker:

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
-from src.config import AppConfig
-from src.types import TaskState
+from multi_agent_security.config import AppConfig
+from multi_agent_security.types import TaskState
 
 
 class BaseOrchestrator(ABC):

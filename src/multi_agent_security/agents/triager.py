@@ -1,11 +1,11 @@
 from pydantic import BaseModel
 
-from src.agents.base import BaseAgent
-from src.types import AgentMessage
+from multi_agent_security.agents.base import BaseAgent
+from multi_agent_security.types import AgentMessage
 
 
-class ScannerAgent(BaseAgent):
-    name = "scanner"
+class TriagerAgent(BaseAgent):
+    name = "triager"
 
     async def run(
         self, input_data: BaseModel, context: list[AgentMessage]

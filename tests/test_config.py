@@ -4,7 +4,7 @@ import shutil
 import pytest
 from pydantic import ValidationError
 
-from src.config import AppConfig, LLMConfig, load_config
+from multi_agent_security.config import AppConfig, LLMConfig, load_config
 
 CONFIG_PATH = pathlib.Path(__file__).parent.parent / "config" / "default.yaml"
 

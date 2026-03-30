@@ -2,9 +2,9 @@ from abc import ABC, abstractmethod
 
 from pydantic import BaseModel
 
-from src.config import AppConfig
-from src.llm_client import LLMClient
-from src.types import AgentMessage
+from multi_agent_security.config import AppConfig
+from multi_agent_security.llm_client import LLMClient
+from multi_agent_security.types import AgentMessage
 
 
 class BaseAgent(ABC):
