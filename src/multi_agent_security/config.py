@@ -124,13 +124,37 @@ def _apply_env_overrides(data: dict) -> dict:
     return data
 
 
+def _deep_merge(base: dict, override: dict) -> dict:
+    """Recursively merge override into base. override wins on conflicts."""
+    result = dict(base)
+    for k, v in override.items():
+        if k in result and isinstance(result[k], dict) and isinstance(v, dict):
+            result[k] = _deep_merge(result[k], v)
+        else:
+            result[k] = v
+    return result
+
+
 def load_config(path: str) -> AppConfig:
     """Load and validate configuration from a YAML file.
 
-    Environment variables prefixed with MASR_ override YAML values.
+    If the YAML contains a ``base:`` key, the referenced file is loaded first
+    and the current file's values are deep-merged on top (current wins).
+    The ``base:`` path is resolved relative to the directory of ``path``.
+
+    Environment variables prefixed with MASR_ override all YAML values.
     Returns a frozen, validated AppConfig.
     """
     with open(path) as f:
         raw = yaml.safe_load(f) or {}
+
+    base_path = raw.pop("base", None)
+    if base_path:
+        base_dir = os.path.dirname(os.path.abspath(path))
+        full_base_path = os.path.join(base_dir, base_path)
+        with open(full_base_path) as f:
+            base_raw = yaml.safe_load(f) or {}
+        raw = _deep_merge(base_raw, raw)
+
     raw = _apply_env_overrides(raw)
     return AppConfig.model_validate(raw)

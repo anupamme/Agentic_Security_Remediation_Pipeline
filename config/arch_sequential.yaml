@@ -1,1 +1,4 @@
+base: "default.yaml"
 architecture: "sequential"
+memory:
+  strategy: "full_context"

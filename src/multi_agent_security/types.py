@@ -110,6 +110,7 @@ class TaskState(BaseModel):
     """Global state for a single vulnerability remediation task."""
     task_id: str
     repo_url: str
+    language: str = "python"
     vulnerabilities: list[Vulnerability] = []
     triage_results: list[TriageResult] = []
     patches: list[Patch] = []
@@ -118,6 +119,7 @@ class TaskState(BaseModel):
     status: str = "pending"  # pending, scanning, triaging, patching, reviewing, complete, failed
     revision_count: int = 0
     max_revisions: int = 3
+    failed_vulns: list[str] = []
 
 
 class BenchmarkExample(BaseModel):
