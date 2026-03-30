@@ -1,1 +1,8 @@
+base: "default.yaml"
 architecture: "hub_spoke"
+memory:
+  strategy: "full_context"  # memory stores everything; orchestrator filters
+orchestrator:
+  type: "llm_based"  # "rule_based" for cheaper/faster runs
+  routing_model: "claude-sonnet-4-20250514"
+  max_summary_tokens: 500
