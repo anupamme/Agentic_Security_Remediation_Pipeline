@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, field_validator
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 from datetime import datetime, timezone
 
 
@@ -133,6 +133,9 @@ class BenchmarkExample(BaseModel):
     merge_status: str  # "merged" or "rejected"
     complexity_tag: str  # "single_file", "multi_file", "dependency", "config"
     negative: bool = False  # True if this is a negative example (no real vuln)
+    pr_url: Optional[str] = None
+    classification_confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class EvalResult(BaseModel):
