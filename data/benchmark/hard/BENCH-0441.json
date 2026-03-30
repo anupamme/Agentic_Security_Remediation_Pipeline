@@ -1,0 +1,23 @@
+{
+  "id": "BENCH-0441",
+  "repo_url": "https://github.com/infra-tools/frontend",
+  "repo_name": "infra-tools/frontend",
+  "language": "javascript",
+  "vulnerable_files": [
+    "package.json"
+  ],
+  "vuln_type": "CWE-79",
+  "severity": "high",
+  "ground_truth_diff": "--- a/package.json\n+++ b/package.json\n@@ -1,3 +1,4 @@\n-# vulnerable\n+# fixed",
+  "merge_status": "rejected",
+  "complexity_tag": "dependency",
+  "negative": false,
+  "pr_url": "https://github.com/infra-tools/frontend/pull/18",
+  "classification_confidence": 1.0,
+  "metadata": {
+    "files_in_repo": 0,
+    "diff_lines_added": 1,
+    "diff_lines_removed": 1,
+    "source_format": "github_api"
+  }
+}
