@@ -105,8 +105,10 @@ async def run_single_benchmark(args) -> EvalResult:
     found_types = {v.vuln_type for v in result.vulnerabilities}
     expected_type = example.vuln_type
     detection_recall = 1.0 if expected_type in found_types else 0.0
+    # Precision = TP / (TP + FP): if the expected type was found, TP=1 and
+    # FP = number of other distinct types reported; otherwise precision = 0.
     detection_precision = (
-        1.0 if found_types and expected_type in found_types else 0.0
+        1.0 / len(found_types) if expected_type in found_types else 0.0
     )
 
     accepted_patches = [r for r in result.reviews if r.patch_accepted]
