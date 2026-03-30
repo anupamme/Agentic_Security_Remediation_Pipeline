@@ -275,9 +275,10 @@ class TestPatcherAgent:
     async def test_format_detection_unified_diff_branch(
         self, app_config, dry_run_llm_client
     ):
-        """When LLM returns a unified diff directly, it is used as-is."""
+        """When LLM returns a unified diff instead of the full file, treat it as
+        invalid: patched_code falls back to the original and unified_diff is empty
+        (ensuring the Patch object stays internally consistent)."""
         agent = PatcherAgent(config=app_config, llm_client=dry_run_llm_client)
-        # Craft a fake unified diff
         fake_diff = (
             "--- a/app.py\n+++ b/app.py\n"
             "@@ -7,1 +7,1 @@\n"
@@ -296,7 +297,10 @@ class TestPatcherAgent:
         with patch.object(dry_run_llm_client, "complete", AsyncMock(return_value=mock_resp)):
             output, _ = await agent.run(inp, context=[])
 
-        assert output.patch.unified_diff == fake_diff
+        # patched_code must equal the original (no inconsistent state)
+        assert output.patch.patched_code == _SQL_ORIGINAL
+        # unified_diff is derived from original vs patched_code → empty
+        assert output.patch.unified_diff == ""
 
     async def test_format_detection_full_file_branch(
         self, app_config, dry_run_llm_client

@@ -136,26 +136,26 @@ class PatcherAgent(BaseAgent):
         # Strip markdown code fences if the LLM wrapped the code
         raw = _strip_code_fences(llm_result.patched_code)
 
-        # Determine final patched file content and unified diff
-        is_unified_diff = "---" in raw and "+++" in raw and "@@" in raw
-
-        if is_unified_diff:
-            # Branch 1: LLM returned a unified diff directly
+        # Determine final patched file content.
+        # The LLM is instructed to return the full patched file (or a snippet).
+        # If it returns a unified diff instead, that is an invalid format for
+        # patched_code — fall back to the original so the Patch object stays
+        # consistent (patched_code and unified_diff always agree with each other).
+        if "---" in raw and "+++" in raw and "@@" in raw:
+            # LLM disobeyed the prompt and returned a diff; treat as invalid.
             logger.warning(
-                "LLM returned a unified diff for %s; using it directly. "
-                "patched_code will equal original as best-effort fallback.",
+                "LLM returned a unified diff for %s instead of the full patched "
+                "file; treating as invalid format and falling back to original.",
                 vuln.id,
             )
-            unified_diff = raw
-            final_patched_code = inp.file_content  # best-effort: diff is authoritative
-
+            final_patched_code = inp.file_content
         else:
             ratio = len(raw) / max(len(inp.file_content), 1)
             if 0.8 <= ratio <= 1.2:
-                # Branch 2: LLM returned the full patched file
+                # LLM returned the full patched file
                 final_patched_code = raw
             else:
-                # Branch 3: LLM returned a snippet — splice into original
+                # LLM returned a snippet — splice into original at the vuln lines
                 logger.info(
                     "LLM returned a code snippet for %s (length ratio=%.2f); "
                     "applying to original at lines %d-%d",
@@ -165,9 +165,11 @@ class PatcherAgent(BaseAgent):
                     inp.file_content, raw, vuln.line_start, vuln.line_end
                 )
 
-            unified_diff = generate_unified_diff(
-                inp.file_content, final_patched_code, vuln.file_path
-            )
+        # Always derive unified_diff from the final_patched_code so the Patch
+        # object is internally consistent (patched_code ↔ unified_diff agree).
+        unified_diff = generate_unified_diff(
+            inp.file_content, final_patched_code, vuln.file_path
+        )
 
         if not validate_diff(unified_diff):
             logger.warning("Generated diff for %s failed validation", vuln.id)
