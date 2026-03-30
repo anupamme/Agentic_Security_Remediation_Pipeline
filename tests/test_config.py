@@ -2,8 +2,9 @@ import pathlib
 import shutil
 
 import pytest
+from pydantic import ValidationError
 
-from src.config import AppConfig, load_config
+from src.config import AppConfig, LLMConfig, load_config
 
 CONFIG_PATH = pathlib.Path(__file__).parent.parent / "config" / "default.yaml"
 
@@ -54,3 +55,40 @@ def test_env_var_override_log_level(monkeypatch, tmp_path):
     monkeypatch.setenv("MASR_LOG_LEVEL", "DEBUG")
     config = load_config(str(tmp_path / "default.yaml"))
     assert config.logging.level == "DEBUG"
+
+
+# --- Bedrock config ---
+
+def test_llm_config_bedrock_valid():
+    cfg = LLMConfig(
+        provider="bedrock",
+        model="anthropic.claude-sonnet-4-20250514-v1:0",
+        aws_region="us-east-1",
+    )
+    assert cfg.provider == "bedrock"
+    assert cfg.aws_region == "us-east-1"
+
+
+def test_llm_config_bedrock_requires_region():
+    with pytest.raises(ValidationError, match="aws_region"):
+        LLMConfig(provider="bedrock", model="anthropic.claude-sonnet-4-20250514-v1:0")
+
+
+def test_llm_config_bedrock_optional_profile():
+    cfg = LLMConfig(
+        provider="bedrock",
+        model="anthropic.claude-sonnet-4-20250514-v1:0",
+        aws_region="eu-west-1",
+        aws_profile="my-profile",
+    )
+    assert cfg.aws_profile == "my-profile"
+
+
+def test_env_var_override_aws_region(monkeypatch, tmp_path):
+    shutil.copy(CONFIG_PATH, tmp_path / "default.yaml")
+    monkeypatch.setenv("MASR_LLM_PROVIDER", "bedrock")
+    monkeypatch.setenv("MASR_AWS_REGION", "us-west-2")
+    monkeypatch.setenv("MASR_LLM_MODEL", "anthropic.claude-sonnet-4-20250514-v1:0")
+    config = load_config(str(tmp_path / "default.yaml"))
+    assert config.llm.provider == "bedrock"
+    assert config.llm.aws_region == "us-west-2"

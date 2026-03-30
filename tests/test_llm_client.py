@@ -74,3 +74,40 @@ def test_llm_client_dry_run_flag(llm_config):
 def test_llm_client_has_no_anthropic_client_in_dry_run(llm_config):
     client = LLMClient(config=llm_config, dry_run=True)
     assert not hasattr(client, "_client")
+
+
+# --- Bedrock ---
+
+@pytest.fixture
+def bedrock_config() -> LLMConfig:
+    return LLMConfig(
+        provider="bedrock",
+        model="anthropic.claude-sonnet-4-20250514-v1:0",
+        aws_region="us-east-1",
+    )
+
+
+@pytest.fixture
+def dry_bedrock_client(bedrock_config) -> LLMClient:
+    return LLMClient(config=bedrock_config, dry_run=True)
+
+
+async def test_bedrock_dry_run_returns_llm_response(dry_bedrock_client, bedrock_config):
+    response = await dry_bedrock_client.complete(
+        system_prompt="You are a helpful assistant.",
+        user_prompt="Say hello.",
+    )
+    assert isinstance(response, LLMResponse)
+    assert response.model == bedrock_config.model
+    assert response.input_tokens > 0
+    assert response.cost_usd >= 0.0
+
+
+def test_bedrock_dry_run_no_client_instantiated(bedrock_config):
+    client = LLMClient(config=bedrock_config, dry_run=True)
+    assert not hasattr(client, "_client")
+
+
+def test_compute_cost_bedrock_same_as_anthropic():
+    assert _compute_cost(1_000_000, 0, "bedrock") == _compute_cost(1_000_000, 0, "anthropic")
+    assert _compute_cost(0, 1_000_000, "bedrock") == _compute_cost(0, 1_000_000, "anthropic")

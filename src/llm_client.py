@@ -9,9 +9,13 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from src.config import LLMConfig
 
-# Pricing constants (per million tokens)
-_INPUT_COST_PER_M = 3.0
-_OUTPUT_COST_PER_M = 15.0
+# Pricing constants per million tokens.
+# Bedrock pricing mirrors Anthropic list price for Claude Sonnet;
+# update per https://aws.amazon.com/bedrock/pricing/ if needed.
+_PRICING: dict[str, dict[str, float]] = {
+    "anthropic": {"input": 3.0, "output": 15.0},
+    "bedrock": {"input": 3.0, "output": 15.0},
+}
 
 _DRY_RUN_CONTENT = '{"result": "dry_run_mock_response"}'
 
@@ -30,8 +34,14 @@ class LLMClient:
         self.config = config
         self.dry_run = dry_run
         if not dry_run:
-            api_key = os.environ.get(config.api_key_env)
-            self._client = anthropic.AsyncAnthropic(api_key=api_key)
+            if config.provider == "bedrock":
+                self._client = anthropic.AsyncAnthropicBedrock(
+                    aws_region=config.aws_region,
+                    aws_profile=config.aws_profile,
+                )
+            else:
+                api_key = os.environ.get(config.api_key_env)
+                self._client = anthropic.AsyncAnthropic(api_key=api_key)
 
     async def complete(
         self,
@@ -71,7 +81,7 @@ class LLMClient:
             content = "This is a dry-run mock response."
         input_tokens = max(1, (len(system_prompt) + len(user_prompt)) // 4)
         output_tokens = max(1, len(content) // 4)
-        cost = _compute_cost(input_tokens, output_tokens)
+        cost = _compute_cost(input_tokens, output_tokens, self.config.provider)
         return LLMResponse(
             content=content,
             input_tokens=input_tokens,
@@ -118,7 +128,7 @@ class LLMClient:
         content = message.content[0].text if message.content else ""
         input_tokens = message.usage.input_tokens
         output_tokens = message.usage.output_tokens
-        cost = _compute_cost(input_tokens, output_tokens)
+        cost = _compute_cost(input_tokens, output_tokens, self.config.provider)
 
         return LLMResponse(
             content=content,
@@ -130,7 +140,8 @@ class LLMClient:
         )
 
 
-def _compute_cost(input_tokens: int, output_tokens: int) -> float:
-    return (input_tokens / 1_000_000) * _INPUT_COST_PER_M + (
+def _compute_cost(input_tokens: int, output_tokens: int, provider: str = "anthropic") -> float:
+    pricing = _PRICING.get(provider, _PRICING["anthropic"])
+    return (input_tokens / 1_000_000) * pricing["input"] + (
         output_tokens / 1_000_000
-    ) * _OUTPUT_COST_PER_M
+    ) * pricing["output"]

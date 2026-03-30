@@ -1,7 +1,7 @@
 import os
 import yaml
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ProjectConfig(BaseModel):
@@ -10,11 +10,20 @@ class ProjectConfig(BaseModel):
 
 
 class LLMConfig(BaseModel):
-    provider: str = "anthropic"
+    provider: str = "anthropic"  # "anthropic" | "bedrock"
     model: str = "claude-sonnet-4-20250514"
     max_tokens: int = 4096
     temperature: float = 0.0
     api_key_env: str = "ANTHROPIC_API_KEY"
+    # Bedrock-specific (ignored when provider="anthropic")
+    aws_region: Optional[str] = None
+    aws_profile: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _check_bedrock_fields(self) -> "LLMConfig":
+        if self.provider == "bedrock" and not self.aws_region:
+            raise ValueError("aws_region is required when provider='bedrock'")
+        return self
 
 
 class MemoryConfig(BaseModel):
@@ -100,6 +109,8 @@ def _apply_env_overrides(data: dict) -> dict:
         "MASR_ARCHITECTURE": ("architecture",),
         "MASR_MEMORY_STRATEGY": ("memory", "strategy"),
         "MASR_LOG_LEVEL": ("logging", "level"),
+        "MASR_AWS_REGION": ("llm", "aws_region"),
+        "MASR_AWS_PROFILE": ("llm", "aws_profile"),
     }
     for env_var, path in mapping.items():
         value = os.environ.get(env_var)
