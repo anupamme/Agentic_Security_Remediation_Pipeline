@@ -378,19 +378,22 @@ class TestConfigInheritance:
         config = load_config(str(config_path))
         assert config.architecture == "sequential"
         assert config.memory.strategy == "full_context"
-        # Inherited from default.yaml
-        assert config.llm.model == "claude-sonnet-4-20250514"
+        # These fields are inherited from default.yaml and not overrideable by env vars
         assert config.agents.patcher.max_revision_loops == 3
+        assert config.agents.scanner.use_static_analysis is True
+        assert config.orchestrator.timeout_seconds == 300
 
     def test_deep_merge_override(self, tmp_path):
         from multi_agent_security.config import load_config
         base = tmp_path / "base.yaml"
-        base.write_text("llm:\n  model: base-model\n  max_tokens: 1000\n")
+        base.write_text("llm:\n  max_tokens: 1000\nagents:\n  patcher:\n    max_revision_loops: 5\n")
         override = tmp_path / "override.yaml"
-        override.write_text(f"base: base.yaml\nllm:\n  model: override-model\n")
+        override.write_text("base: base.yaml\nagents:\n  patcher:\n    max_revision_loops: 2\n")
         config = load_config(str(override))
-        assert config.llm.model == "override-model"
-        assert config.llm.max_tokens == 1000  # preserved from base
+        # Override wins
+        assert config.agents.patcher.max_revision_loops == 2
+        # Base value preserved for non-overridden key
+        assert config.llm.max_tokens == 1000
 
 
 # ---------------------------------------------------------------------------

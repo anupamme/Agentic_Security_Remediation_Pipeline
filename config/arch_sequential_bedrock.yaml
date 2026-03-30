@@ -1,0 +1,8 @@
+base: "default.yaml"                                                                                                                                                                                   
+architecture: "sequential"                                                                                                                                                                             
+memory:                                                                                                                                                                                                
+  strategy: "full_context"                                                                                                                                                                             
+llm:                                                                                                                                                                                                   
+  provider: "bedrock"
+  model: "us.anthropic.claude-haiku-4-5-20251001-v1:0" 
+  aws_region: "us-west-2"
