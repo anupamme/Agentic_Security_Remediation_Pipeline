@@ -111,6 +111,7 @@ class TaskState(BaseModel):
     task_id: str
     repo_url: str
     language: str = "python"
+    target_files: list[str] = []  # Empty = scan all files in repo
     vulnerabilities: list[Vulnerability] = []
     triage_results: list[TriageResult] = []
     patches: list[Patch] = []

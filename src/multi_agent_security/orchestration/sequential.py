@@ -43,7 +43,7 @@ class SequentialOrchestrator(BaseOrchestrator):
         # --- Scanner ---
         scanner_input = ScannerInput(
             repo_path=repo_path,
-            target_files=task_state.vulnerabilities and [] or [],
+            target_files=task_state.target_files,  # Empty = scan all files
             language=repo_metadata.language,
             static_analysis_results=static_findings or None,
         )
