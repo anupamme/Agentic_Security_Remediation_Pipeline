@@ -218,10 +218,6 @@ def generate_one(index: int, rng: random.Random) -> BenchmarkExample:
     vulnerable_files = lang_files[complexity_tag]
 
     diff = MOCK_DIFFS.get(vuln_type, MOCK_DIFFS[VulnType.OTHER])
-    # Patch the diff to reference the right files
-    if vulnerable_files:
-        f = vulnerable_files[0]
-        diff = f"--- a/{f}\n+++ b/{f}\n@@ -1,3 +1,4 @@\n-# vulnerable\n+# fixed\n"
 
     merge_status = "merged" if rng.random() < 0.8 else "rejected"
     confidence = round(0.7 + rng.random() * 0.3, 3)
