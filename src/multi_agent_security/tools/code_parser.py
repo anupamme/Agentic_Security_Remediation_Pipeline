@@ -78,7 +78,8 @@ def _detect_python_framework(repo_path: str) -> Optional[str]:
     for pattern in ["*.py", "*/*.py"]:
         for path in _glob.glob(os.path.join(repo_path, pattern)):
             try:
-                content = open(path, encoding="utf-8", errors="replace").read()
+                with open(path, encoding="utf-8", errors="replace") as f:
+                    content = f.read()
             except OSError:
                 continue
             for regex, name in _PYTHON_FRAMEWORK_PATTERNS:
@@ -108,7 +109,8 @@ def _detect_js_framework(repo_path: str) -> Optional[str]:
 def _detect_go_framework(repo_path: str) -> Optional[str]:
     for path in _glob.glob(os.path.join(repo_path, "**", "*.go"), recursive=True):
         try:
-            content = open(path, encoding="utf-8", errors="replace").read()
+            with open(path, encoding="utf-8", errors="replace") as f:
+                content = f.read()
         except OSError:
             continue
         for import_path, name in _GO_FRAMEWORK_IMPORTS.items():
@@ -123,7 +125,8 @@ def _detect_java_framework(repo_path: str) -> Optional[str]:
         if not os.path.isfile(path):
             continue
         try:
-            content = open(path, encoding="utf-8", errors="replace").read()
+            with open(path, encoding="utf-8", errors="replace") as f:
+                content = f.read()
         except OSError:
             continue
         for regex, name in _JAVA_FRAMEWORK_PATTERNS:
