@@ -1,0 +1,33 @@
+{
+  "split": "test",
+  "total_examples": 128,
+  "positive_examples": 117,
+  "negative_examples": 11,
+  "by_vuln_type": {
+    "CWE-502": 13,
+    "CWE-327": 13,
+    "CWE-20": 11,
+    "CWE-78": 10,
+    "CWE-284": 5,
+    "CWE-22": 6,
+    "OTHER": 17,
+    "CWE-798": 13,
+    "CWE-79": 9,
+    "CWE-918": 16,
+    "CWE-1104": 9,
+    "CWE-89": 6
+  },
+  "by_complexity": {
+    "single_file": 110,
+    "config": 10,
+    "dependency": 8
+  },
+  "by_language": {
+    "go": 34,
+    "javascript": 28,
+    "python": 57,
+    "java": 9
+  },
+  "created_at": "2026-03-30T04:38:19.567961+00:00",
+  "random_seed": 42
+}
