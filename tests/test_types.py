@@ -144,6 +144,19 @@ def test_agent_message():
     assert msg.agent_name == "scanner"
 
 
+def test_agent_message_naive_timestamp_rejected():
+    with pytest.raises(ValidationError, match="timezone-aware"):
+        AgentMessage(
+            agent_name="scanner",
+            timestamp=datetime(2024, 1, 1, 12, 0, 0),  # naive — no tzinfo
+            content="{}",
+            token_count_input=10,
+            token_count_output=5,
+            latency_ms=100.0,
+            cost_usd=0.0001,
+        )
+
+
 def test_task_state(sample_task_state):
     assert sample_task_state.task_id == "task-001"
     assert sample_task_state.status == "pending"

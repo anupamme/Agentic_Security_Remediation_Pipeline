@@ -1,7 +1,7 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from enum import Enum
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class VulnSeverity(str, Enum):
@@ -97,6 +97,13 @@ class AgentMessage(BaseModel):
     token_count_output: int
     latency_ms: float
     cost_usd: float
+
+    @field_validator("timestamp")
+    @classmethod
+    def require_timezone_aware(cls, v: datetime) -> datetime:
+        if v.tzinfo is None or v.tzinfo.utcoffset(v) is None:
+            raise ValueError("timestamp must be timezone-aware (e.g. datetime.now(timezone.utc))")
+        return v
 
 
 class TaskState(BaseModel):
