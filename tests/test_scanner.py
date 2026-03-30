@@ -157,11 +157,35 @@ class TestDeduplication:
         result = _deduplicate([a, b])
         assert len(result) == 2
 
-    def test_exactly_50_percent_overlap_not_deduped(self):
+    def test_single_line_overlap_is_deduped(self):
+        # a: 5-5 (1 line), b: 5-5 (1 line) — identical single-line findings
+        # overlap = min(5,5) - max(5,5) + 1 = 1; 1/1 = 1.0 > 0.5 → IS a dup
+        a = self._candidate("a.py", 5, 5, 0.9)
+        b = self._candidate("a.py", 5, 5, 0.7)
+        result = _deduplicate([a, b])
+        assert len(result) == 1
+
+    def test_adjacent_ranges_not_deduped(self):
+        # a: 1-5, b: 6-10 — no overlap at all
+        # overlap = min(5,10) - max(1,6) + 1 = 5 - 6 + 1 = 0 (clamped) → NOT a dup
+        a = self._candidate("a.py", 1, 5, 0.9)
+        b = self._candidate("a.py", 6, 10, 0.7)
+        result = _deduplicate([a, b])
+        assert len(result) == 2
+
+    def test_partial_overlap_over_threshold_is_deduped(self):
         # a: 0-10 (11 lines), b: 5-15 (11 lines)
-        # overlap = min(10,15) - max(0,5) = 5 lines; 5/11 ≈ 0.45 < 0.5 → NOT a dup
+        # overlap = min(10,15) - max(0,5) + 1 = 6; 6/11 ≈ 0.545 > 0.5 → IS a dup
         a = self._candidate("a.py", 0, 10, 0.9)
         b = self._candidate("a.py", 5, 15, 0.7)
+        result = _deduplicate([a, b])
+        assert len(result) == 1
+
+    def test_partial_overlap_under_threshold_not_deduped(self):
+        # a: 0-10 (11 lines), b: 8-18 (11 lines)
+        # overlap = min(10,18) - max(0,8) + 1 = 3; 3/11 ≈ 0.27 < 0.5 → NOT a dup
+        a = self._candidate("a.py", 0, 10, 0.9)
+        b = self._candidate("a.py", 8, 18, 0.7)
         result = _deduplicate([a, b])
         assert len(result) == 2
 

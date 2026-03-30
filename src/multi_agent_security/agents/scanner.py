@@ -183,7 +183,7 @@ def _line_range(c: _VulnCandidate) -> int:
 
 
 def _overlap_pct(a: _VulnCandidate, b: _VulnCandidate) -> float:
-    overlap = max(0, min(a.line_end, b.line_end) - max(a.line_start, b.line_start))
+    overlap = max(0, min(a.line_end, b.line_end) - max(a.line_start, b.line_start) + 1)
     min_range = min(_line_range(a), _line_range(b))
     return overlap / min_range if min_range > 0 else 0.0
 
