@@ -19,6 +19,16 @@ _PRICING: dict[str, dict[str, float]] = {
 
 _DRY_RUN_CONTENT = '{"result": "dry_run_mock_response"}'
 
+_CODE_FENCE_RE = __import__("re").compile(
+    r"^\s*```(?:json)?\s*\n?(.*?)\n?\s*```\s*$", __import__("re").DOTALL
+)
+
+
+def _strip_json_fences(text: str) -> str:
+    """Strip markdown code fences (```json ... ``` or ``` ... ```) from LLM output."""
+    m = _CODE_FENCE_RE.match(text.strip())
+    return m.group(1).strip() if m else text
+
 
 class LLMResponse(BaseModel):
     content: str
@@ -100,12 +110,16 @@ class LLMClient:
         response = await self._raw_call(system_prompt, user_prompt)
 
         if response_format is not None:
+            cleaned = _strip_json_fences(response.content)
             try:
-                response_format.model_validate_json(response.content)
+                response_format.model_validate_json(cleaned)
+                response = response.model_copy(update={"content": cleaned})
             except Exception:
                 # Retry once
                 response = await self._raw_call(system_prompt, user_prompt)
-                response_format.model_validate_json(response.content)
+                cleaned = _strip_json_fences(response.content)
+                response_format.model_validate_json(cleaned)
+                response = response.model_copy(update={"content": cleaned})
 
         return response
 

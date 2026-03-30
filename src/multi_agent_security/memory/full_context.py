@@ -5,11 +5,17 @@ from multi_agent_security.types import AgentMessage
 
 
 class FullContextMemory(BaseMemory):
+    """Simplest memory strategy: every agent receives the complete message history."""
+
+    def __init__(self):
+        self._messages: list[AgentMessage] = []
+
     def store(self, message: AgentMessage) -> None:
-        raise NotImplementedError
+        self._messages.append(message)
 
     def retrieve(self, agent_name: str, query: Optional[str] = None) -> list[AgentMessage]:
-        raise NotImplementedError
+        """Return ALL messages. No filtering."""
+        return list(self._messages)
 
     def clear(self) -> None:
-        raise NotImplementedError
+        self._messages = []
