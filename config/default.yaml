@@ -1,0 +1,50 @@
+project:
+  name: "multi-agent-security"
+  version: "0.1.0"
+
+llm:
+  provider: "anthropic"
+  model: "claude-sonnet-4-20250514"
+  max_tokens: 4096
+  temperature: 0.0
+  api_key_env: "ANTHROPIC_API_KEY"
+
+architecture: "sequential"  # "sequential" | "hub_spoke" | "blackboard"
+
+memory:
+  strategy: "full_context"  # "full_context" | "sliding_window" | "retrieval"
+  sliding_window_size: 10
+  summary_model: "claude-sonnet-4-20250514"
+  retrieval_top_k: 5
+  embedding_model: "voyage-3"
+
+agents:
+  scanner:
+    enabled: true
+    max_files_per_call: 5
+    use_static_analysis: true
+    static_analysis_tools:
+      - "semgrep"
+  triager:
+    enabled: true
+  patcher:
+    enabled: true
+    max_revision_loops: 3
+    run_tests: true
+  reviewer:
+    enabled: true
+
+orchestrator:
+  type: "rule_based"  # "rule_based" | "llm_based"
+  max_retries: 2
+  timeout_seconds: 300
+
+eval:
+  judge_model: "claude-sonnet-4-20250514"
+  num_runs: 3
+  parallel_workers: 4
+
+logging:
+  level: "INFO"
+  structured: true
+  output_file: "data/results/run.jsonl"
