@@ -66,6 +66,8 @@ class OrchestratorConfig(BaseModel):
     type: str = "rule_based"
     max_retries: int = 2
     timeout_seconds: int = 300
+    routing_model: str = "claude-sonnet-4-20250514"
+    max_summary_tokens: int = 500
 
 
 class EvalConfig(BaseModel):
