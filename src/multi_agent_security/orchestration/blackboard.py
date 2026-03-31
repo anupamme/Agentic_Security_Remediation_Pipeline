@@ -375,7 +375,8 @@ class BlackboardOrchestrator(BaseOrchestrator):
                 )
                 try:
                     patcher_output, _ = await self._run_agent_with_blackboard(
-                        self.agents["patcher"], patcher_input, task_state, vuln_id=vuln_id
+                        self.agents["patcher"], patcher_input, task_state,
+                        vuln_id=vuln_id, file_path=vuln.file_path,
                     )
                 except Exception as exc:
                     logger.error(
@@ -414,7 +415,8 @@ class BlackboardOrchestrator(BaseOrchestrator):
                 )
                 try:
                     reviewer_output, _ = await self._run_agent_with_blackboard(
-                        self.agents["reviewer"], reviewer_input, task_state, vuln_id=vuln_id
+                        self.agents["reviewer"], reviewer_input, task_state,
+                        vuln_id=vuln_id, file_path=vuln.file_path,
                     )
                 except Exception as exc:
                     logger.error(
@@ -463,6 +465,7 @@ class BlackboardOrchestrator(BaseOrchestrator):
         input_data: BaseModel,
         task_state: TaskState,
         vuln_id: Optional[str] = None,
+        file_path: Optional[str] = None,
     ) -> tuple[BaseModel, AgentMessage]:
         """
         1. Get blackboard context for this agent (filtered by permissions).
@@ -474,6 +477,7 @@ class BlackboardOrchestrator(BaseOrchestrator):
         context_str = self.blackboard.to_prompt_context(
             agent.name,
             vuln_id=vuln_id,
+            file_path=file_path,
             max_tokens=self.config.memory.max_context_tokens,
         )
         bb_context = AgentMessage(

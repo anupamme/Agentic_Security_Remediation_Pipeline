@@ -339,6 +339,22 @@ class TestPermissionFiltering:
         assert "scanner.vulnerabilities.VULN-001" in view
         assert not any(k.startswith("patcher") for k in view)
 
+    def test_patcher_sees_file_when_file_path_provided(self):
+        bb = self._populated_bb()
+        view = bb.read_for_agent("patcher", vuln_id="VULN-001", file_path="app.py")
+        assert "files.app.py" in view
+
+    def test_patcher_misses_file_without_file_path(self):
+        """Regression: omitting file_path must leave files.* out of the view."""
+        bb = self._populated_bb()
+        view = bb.read_for_agent("patcher", vuln_id="VULN-001")
+        assert not any(k.startswith("files.") for k in view)
+
+    def test_reviewer_sees_file_when_file_path_provided(self):
+        bb = self._populated_bb()
+        view = bb.read_for_agent("reviewer", vuln_id="VULN-001", file_path="app.py")
+        assert "files.app.py" in view
+
     def test_patcher_only_sees_its_own_vuln(self):
         bb = self._populated_bb()
         view = bb.read_for_agent("patcher", vuln_id="VULN-001", file_path="app.py")
@@ -612,3 +628,24 @@ class TestBlackboardOrchestratorPipeline:
         context = patcher.run.call_args[0][1]
         assert len(context) == 1
         assert context[0].agent_name == "blackboard"
+
+    @pytest.mark.asyncio
+    async def test_patcher_context_includes_file_content(self, tmp_path):
+        """Regression: file_path must be forwarded so files.* entries reach patcher."""
+        vuln = _make_vuln(file_path="app.py")
+        file_text = FIXTURES_DIR.joinpath("app.py").read_text()
+        (tmp_path / "app.py").write_text(file_text)
+
+        config = _make_config()
+        patcher = _make_patcher_agent()
+        orch = _build_orchestrator(
+            config,
+            _make_scanner_agent([vuln]),
+            _make_triager_agent([vuln]),
+            patcher,
+            _make_reviewer_agent(accepted=True),
+        )
+        await orch.run(str(tmp_path), _base_task_state())
+
+        context_content = patcher.run.call_args[0][1][0].content
+        assert "files.app.py" in context_content
