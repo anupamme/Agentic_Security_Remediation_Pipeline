@@ -1,4 +1,5 @@
 import asyncio
+import fnmatch
 import json
 import logging
 import os
@@ -20,6 +21,33 @@ from multi_agent_security.tools.test_runner import run_tests_on_patched_code
 from multi_agent_security.types import AgentMessage, TaskState
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# File-loading constants
+# ---------------------------------------------------------------------------
+
+# Directories that are never useful to load into the blackboard.
+_SKIP_DIRS: frozenset[str] = frozenset({
+    ".git", ".hg", ".svn",
+    "node_modules", ".npm",
+    "vendor", "third_party",
+    "__pycache__", ".mypy_cache", ".pytest_cache", ".ruff_cache",
+    "target", "build", "dist", "out", "bin", "obj",
+    ".venv", "venv", "env", ".env",
+    ".idea", ".vscode",
+    "coverage", ".nyc_output",
+})
+
+# Source-file extensions per language (mirrors scanner._LANG_EXTENSIONS).
+_LANG_EXTENSIONS: dict[str, list[str]] = {
+    "python": ["*.py"],
+    "javascript": ["*.js", "*.ts", "*.jsx", "*.tsx"],
+    "go": ["*.go"],
+    "java": ["*.java"],
+}
+
+# Hard cap: skip any file larger than this (bytes).
+_MAX_FILE_BYTES: int = 256 * 1024  # 256 KB
 
 # ---------------------------------------------------------------------------
 # Permissions
@@ -227,20 +255,23 @@ class BlackboardOrchestrator(BaseOrchestrator):
         # Load target files into blackboard
         files_to_load = task_state.target_files or []
         if not files_to_load:
-            # Scan all files in repo
-            for dirpath, _, filenames in os.walk(repo_path):
-                for fname in filenames:
-                    abs_path = os.path.join(dirpath, fname)
-                    rel_path = os.path.relpath(abs_path, repo_path)
-                    files_to_load.append(rel_path)
+            files_to_load = self._collect_source_files(repo_path, repo_metadata.language)
 
+        loaded = skipped = 0
         for rel_path in files_to_load:
             abs_path = os.path.join(repo_path, rel_path)
             try:
+                size = os.path.getsize(abs_path)
+                if size > _MAX_FILE_BYTES:
+                    logger.debug("Skipping oversized file %s (%d bytes)", rel_path, size)
+                    skipped += 1
+                    continue
                 with open(abs_path, encoding="utf-8", errors="replace") as fh:
                     self.blackboard.write(f"files.{rel_path}", fh.read(), "orchestrator")
+                loaded += 1
             except OSError:
                 pass
+        logger.info("Loaded %d source file(s) into blackboard (%d skipped).", loaded, skipped)
 
         # Static analysis (pre-scanner)
         static_findings = []
@@ -571,6 +602,24 @@ class BlackboardOrchestrator(BaseOrchestrator):
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _collect_source_files(repo_path: str, language: str) -> list[str]:
+        """
+        Walk the repo and return relative paths of source files, skipping:
+        - directories in _SKIP_DIRS (e.g. .git, node_modules, __pycache__)
+        - files that don't match the language's extension patterns
+        """
+        patterns = _LANG_EXTENSIONS.get(language, ["*.*"])
+        result: list[str] = []
+        for dirpath, dirnames, filenames in os.walk(repo_path):
+            # Prune skip-dirs in-place so os.walk won't descend into them.
+            dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
+            for fname in filenames:
+                if any(fnmatch.fnmatch(fname, pat) for pat in patterns):
+                    abs_path = os.path.join(dirpath, fname)
+                    result.append(os.path.relpath(abs_path, repo_path))
+        return result
 
     async def _run_agent(self, agent, input_data, context: list[AgentMessage]):
         """Run an agent with rate-limit back-off and parse-error logging."""
