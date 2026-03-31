@@ -1,13 +1,16 @@
 import json
 import os
 import time
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import anthropic
 from pydantic import BaseModel
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from multi_agent_security.config import LLMConfig
+
+if TYPE_CHECKING:
+    from multi_agent_security.utils.cost_tracker import CostTracker
 
 # Pricing constants per million tokens.
 # Bedrock pricing mirrors Anthropic list price for Claude Sonnet;
@@ -40,9 +43,15 @@ class LLMResponse(BaseModel):
 
 
 class LLMClient:
-    def __init__(self, config: LLMConfig, dry_run: bool = False):
+    def __init__(
+        self,
+        config: LLMConfig,
+        dry_run: bool = False,
+        cost_tracker: Optional["CostTracker"] = None,
+    ):
         self.config = config
         self.dry_run = dry_run
+        self.cost_tracker = cost_tracker
         if not dry_run:
             if config.provider == "bedrock":
                 self._client = anthropic.AsyncAnthropicBedrock(
@@ -58,6 +67,7 @@ class LLMClient:
         system_prompt: str,
         user_prompt: str,
         response_format: Optional[type[BaseModel]] = None,
+        agent_name: str = "unknown",
     ) -> LLMResponse:
         """Make an LLM call.
 
@@ -74,9 +84,19 @@ class LLMClient:
             )
 
         if self.dry_run:
-            return self._mock_response(system_prompt, user_prompt, response_format)
+            response = self._mock_response(system_prompt, user_prompt, response_format)
+        else:
+            response = await self._call_with_retry(system_prompt, user_prompt, response_format)
 
-        return await self._call_with_retry(system_prompt, user_prompt, response_format)
+        if self.cost_tracker is not None:
+            self.cost_tracker.record(
+                agent_name,
+                response.model,
+                response.input_tokens,
+                response.output_tokens,
+                response.latency_ms,
+            )
+        return response
 
     def _mock_response(
         self,

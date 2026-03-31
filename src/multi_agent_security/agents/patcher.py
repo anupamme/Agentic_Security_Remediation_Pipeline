@@ -114,6 +114,7 @@ class PatcherAgent(BaseAgent):
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             response_format=_LLMPatchResponse,
+            agent_name=type(self).name,
         )
 
         metrics = {

@@ -182,6 +182,7 @@ class ReviewerAgent(BaseAgent):
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             response_format=_LLMReviewResponse,
+            agent_name=type(self).name,
         )
 
         try:

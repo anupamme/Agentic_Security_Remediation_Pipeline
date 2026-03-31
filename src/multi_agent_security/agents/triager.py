@@ -119,6 +119,7 @@ class TriagerAgent(BaseAgent):
             system_prompt=system_prompt,
             user_prompt=user_prompt,
             response_format=_LLMTriageResult,
+            agent_name=type(self).name,
         )
 
         metrics = {
