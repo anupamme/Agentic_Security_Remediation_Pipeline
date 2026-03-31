@@ -246,7 +246,12 @@ class ScannerAgent(BaseAgent):
         total_latency_ms = 0.0
         total_cost_usd = 0.0
 
-        for batch in batches:
+        for i, batch in enumerate(batches, 1):
+            logger.info(
+                "Scanning batch %d/%d (files: %s)",
+                i, len(batches),
+                [fc.path for fc in batch.files],
+            )
             candidates, response = await self._scan_batch(batch, inp.language, sa_results or [])
             all_candidates.extend(candidates)
             total_input_tokens += response.get("input_tokens", 0)

@@ -285,11 +285,15 @@ class BlackboardOrchestrator(BaseOrchestrator):
                 logger.warning("Static analysis failed, continuing without it: %s", exc)
 
         # --- Scanner ---
+        logger.info("[blackboard] Phase: scanning")
         scanner_input = ScannerInput(
             repo_path=repo_path,
             target_files=task_state.target_files,
             language=repo_metadata.language,
-            static_analysis_results=static_findings or None,
+            # Pass the list even when empty: the scanner treats None as
+            # "not yet run" and would re-invoke semgrep itself, but an
+            # empty list means "already ran, nothing found".
+            static_analysis_results=static_findings,
         )
         try:
             scanner_output, _ = await self._run_agent_with_blackboard(
@@ -301,14 +305,15 @@ class BlackboardOrchestrator(BaseOrchestrator):
             return task_state
 
         task_state.vulnerabilities = scanner_output.vulnerabilities
+        logger.info("[blackboard] Scanner done: %d vulnerability(s) found.", len(scanner_output.vulnerabilities))
 
         if not scanner_output.vulnerabilities:
-            logger.info("No vulnerabilities found — pipeline complete.")
             task_state.status = "complete"
             return task_state
 
         # --- Triager ---
         task_state.status = "triaging"
+        logger.info("[blackboard] Phase: triaging %d vulnerability(s)", len(scanner_output.vulnerabilities))
         triager_input = TriagerInput(
             vulnerabilities=scanner_output.vulnerabilities,
             repo_metadata=repo_metadata,
@@ -333,6 +338,7 @@ class BlackboardOrchestrator(BaseOrchestrator):
             priority_order_entry.value if priority_order_entry else []
         )
 
+        logger.info("[blackboard] Phase: patching %d vulnerability(s) in priority order", len(priority_order))
         for vuln_id in priority_order:
             vuln_entry = self.blackboard.read(f"scanner.vulnerabilities.{vuln_id}")
             triage_entry = self.blackboard.read(f"triager.triage_results.{vuln_id}")
@@ -363,6 +369,7 @@ class BlackboardOrchestrator(BaseOrchestrator):
             accepted = False
 
             for attempt in range(1, max_loops + 1):
+                logger.info("[blackboard] %s attempt %d/%d — patching", vuln_id, attempt, max_loops)
                 # --- Patcher ---
                 patcher_input = PatcherInput(
                     vulnerability=vuln,
@@ -401,6 +408,7 @@ class BlackboardOrchestrator(BaseOrchestrator):
                         logger.warning("Test run failed for vuln %s: %s", vuln_id, exc)
 
                 # --- Reviewer ---
+                logger.info("[blackboard] %s attempt %d/%d — reviewing", vuln_id, attempt, max_loops)
                 task_state.status = "reviewing"
                 patched_content = patcher_output.patch.patched_code
                 reviewer_input = ReviewerInput(
