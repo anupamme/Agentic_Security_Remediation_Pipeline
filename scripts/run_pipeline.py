@@ -73,7 +73,11 @@ async def run_single_repo(args) -> TaskState:
     repo_path = args.repo
     if repo_path.startswith("http://") or repo_path.startswith("https://"):
         cloner = RepoCloner()
-        repo_path = cloner.clone(args.repo, timeout=args.clone_timeout)
+        cloned = cloner.clone(args.repo, timeout=args.clone_timeout)
+        if cloned is None:
+            repo_path = None
+        else:
+            repo_path = str(cloned)
         if repo_path is None:
             print(
                 f"ERROR: Could not clone {args.repo}. "
