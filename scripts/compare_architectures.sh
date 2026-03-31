@@ -48,11 +48,12 @@ for ARCH in "${CONFIGS[@]}"; do
   OUT="$REPO_ROOT/data/results/${ARCH}_result.json"
   echo ""
   echo "=== $ARCH ==="
+  LOG="$REPO_ROOT/data/results/${ARCH}_run.log"
   python3 "$SCRIPT_DIR/run_pipeline.py" \
     --config "$CONFIG" \
     --repo "$REPO" \
     --language "$LANGUAGE" \
-    > "$OUT" 2>&1 || { echo "  FAILED — see $OUT for details"; continue; }
+    > "$OUT" 2> "$LOG" || { echo "  FAILED — see $LOG for details"; cat "$LOG" | tail -20; continue; }
 
   summarise "$OUT"
 done
