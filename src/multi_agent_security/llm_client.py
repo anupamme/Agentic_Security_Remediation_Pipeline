@@ -57,6 +57,7 @@ class LLMClient:
                 self._client = anthropic.AsyncAnthropicBedrock(
                     aws_region=config.aws_region,
                     aws_profile=config.aws_profile,
+                    timeout=anthropic.Timeout(connect=30.0, read=600.0, write=600.0, pool=600.0),
                 )
             else:
                 api_key = os.environ.get(config.api_key_env)
