@@ -5,12 +5,14 @@ from pydantic import BaseModel
 # Per-token pricing (input/output) keyed by model name.
 # Rates are in USD per token (i.e. listed $/M divided by 1_000_000).
 PRICING: dict[str, dict[str, float]] = {
+    # Anthropic direct
     "claude-sonnet-4-20250514": {"input": 3.0 / 1_000_000, "output": 15.0 / 1_000_000},
-    "claude-haiku-3-5-20241022": {"input": 0.80 / 1_000_000, "output": 4.0 / 1_000_000},
-    # Alias for the model ID used in config/default.yaml
     "claude-3-5-sonnet-20241022": {"input": 3.0 / 1_000_000, "output": 15.0 / 1_000_000},
-    # Bedrock cross-region inference profiles use a different ID format;
-    # add entries here as needed.
+    "claude-haiku-3-5-20241022": {"input": 0.80 / 1_000_000, "output": 4.0 / 1_000_000},
+    # Bedrock cross-region inference profile IDs
+    "us.anthropic.claude-haiku-4-5-20251001-v1:0": {"input": 0.80 / 1_000_000, "output": 4.0 / 1_000_000},
+    "us.anthropic.claude-sonnet-4-5-20251001-v1:0": {"input": 3.0 / 1_000_000, "output": 15.0 / 1_000_000},
+    "us.anthropic.claude-sonnet-4-20250514-v1:0": {"input": 3.0 / 1_000_000, "output": 15.0 / 1_000_000},
     "default": {"input": 3.0 / 1_000_000, "output": 15.0 / 1_000_000},
 }
 
