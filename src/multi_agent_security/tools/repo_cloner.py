@@ -6,6 +6,8 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 
+_DEFAULT_CLONE_TIMEOUT = 300  # seconds; shallow clone of large repos can be slow
+
 logger = logging.getLogger("masr")
 
 
@@ -22,25 +24,43 @@ class RepoCloner:
         name = "_".join(parts[-2:]) if len(parts) >= 2 else parts[-1]
         return re.sub(r"[^a-zA-Z0-9_\-]", "_", name)
 
-    def clone(self, repo_url: str, ref: Optional[str] = None) -> Optional[Path]:
+    def clone(
+        self,
+        repo_url: str,
+        ref: Optional[str] = None,
+        timeout: int = _DEFAULT_CLONE_TIMEOUT,
+    ) -> Optional[Path]:
         """Shallow-clone repo_url to the cache directory.
 
         If ref is provided, fetch and checkout that specific ref (e.g. a parent
         commit SHA) so callers can inspect the pre-fix state of the tree.
 
-        Returns the local path on success, None if the repo is private or
-        no longer exists.
+        Returns the local path on success, None if the clone fails (private,
+        deleted, or timed out).
         """
         dest = self.cache_dir / self._safe_name(repo_url)
 
         if dest.exists():
             return dest
 
-        result = subprocess.run(
-            ["git", "clone", "--depth=1", repo_url, str(dest)],
-            capture_output=True,
-            timeout=120,
-        )
+        try:
+            result = subprocess.run(
+                ["git", "clone", "--depth=1", repo_url, str(dest)],
+                capture_output=True,
+                timeout=timeout,
+            )
+        except subprocess.TimeoutExpired:
+            logger.error(
+                "Clone of %s timed out after %ds. "
+                "Try cloning manually: git clone --depth=1 %s %s",
+                repo_url, timeout, repo_url, dest,
+            )
+            # Remove any partial clone so a retry starts clean.
+            if dest.exists():
+                import shutil
+                shutil.rmtree(dest, ignore_errors=True)
+            return None
+
         if result.returncode != 0:
             logger.warning(
                 "Failed to clone %s (may be private or deleted): %s",

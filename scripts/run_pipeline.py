@@ -73,7 +73,15 @@ async def run_single_repo(args) -> TaskState:
     repo_path = args.repo
     if repo_path.startswith("http://") or repo_path.startswith("https://"):
         cloner = RepoCloner()
-        repo_path = cloner.clone(args.repo)
+        repo_path = cloner.clone(args.repo, timeout=args.clone_timeout)
+        if repo_path is None:
+            print(
+                f"ERROR: Could not clone {args.repo}. "
+                f"Check the URL, your network connection, and consider raising "
+                f"--clone-timeout (current: {args.clone_timeout}s).",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
     task_state = TaskState(
         task_id=str(uuid.uuid4()),
@@ -206,6 +214,10 @@ def main():
     parser.add_argument(
         "--parallel", type=int, default=4,
         help="Max parallel workers for --benchmark-dir mode (default: 4)"
+    )
+    parser.add_argument(
+        "--clone-timeout", type=int, default=300,
+        help="Seconds to wait for git clone before giving up (default: 300)"
     )
     parser.add_argument(
         "--output-dir", default=None,
