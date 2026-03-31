@@ -6,3 +6,7 @@ memory:
 orchestrator:
   type: "rule_based"
   conflict_resolution: "best_score"
+llm:
+  provider: "bedrock"
+  model: "us.anthropic.claude-sonnet-4-5-20251001-v2:0"
+  aws_region: "us-west-2"

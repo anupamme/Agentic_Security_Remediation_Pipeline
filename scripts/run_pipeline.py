@@ -32,10 +32,18 @@ from multi_agent_security.agents.triager import TriagerAgent
 from multi_agent_security.config import load_config
 from multi_agent_security.llm_client import LLMClient
 from multi_agent_security.memory.full_context import FullContextMemory
+from multi_agent_security.orchestration.blackboard import BlackboardOrchestrator
+from multi_agent_security.orchestration.hub_spoke import HubSpokeOrchestrator
 from multi_agent_security.orchestration.sequential import SequentialOrchestrator
 from multi_agent_security.tools.repo_cloner import RepoCloner
 from multi_agent_security.types import BenchmarkExample, EvalResult, TaskState
 from multi_agent_security.utils.logging import setup_logging
+
+_ORCHESTRATORS = {
+    "sequential": SequentialOrchestrator,
+    "hub_spoke": HubSpokeOrchestrator,
+    "blackboard": BlackboardOrchestrator,
+}
 
 
 def _build_orchestrator(config):
@@ -47,7 +55,13 @@ def _build_orchestrator(config):
         "reviewer": ReviewerAgent(config, llm_client),
     }
     memory = FullContextMemory()
-    return SequentialOrchestrator(config, agents, memory)
+    orch_class = _ORCHESTRATORS.get(config.architecture)
+    if orch_class is None:
+        raise ValueError(
+            f"Unknown architecture '{config.architecture}'. "
+            f"Valid options: {list(_ORCHESTRATORS)}"
+        )
+    return orch_class(config, agents, memory)
 
 
 async def run_single_repo(args) -> TaskState:
@@ -59,7 +73,19 @@ async def run_single_repo(args) -> TaskState:
     repo_path = args.repo
     if repo_path.startswith("http://") or repo_path.startswith("https://"):
         cloner = RepoCloner()
-        repo_path = cloner.clone(args.repo)
+        cloned = cloner.clone(args.repo, timeout=args.clone_timeout)
+        if cloned is None:
+            repo_path = None
+        else:
+            repo_path = str(cloned)
+        if repo_path is None:
+            print(
+                f"ERROR: Could not clone {args.repo}. "
+                f"Check the URL, your network connection, and consider raising "
+                f"--clone-timeout (current: {args.clone_timeout}s).",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
     task_state = TaskState(
         task_id=str(uuid.uuid4()),
@@ -192,6 +218,10 @@ def main():
     parser.add_argument(
         "--parallel", type=int, default=4,
         help="Max parallel workers for --benchmark-dir mode (default: 4)"
+    )
+    parser.add_argument(
+        "--clone-timeout", type=int, default=300,
+        help="Seconds to wait for git clone before giving up (default: 300)"
     )
     parser.add_argument(
         "--output-dir", default=None,
