@@ -32,10 +32,18 @@ from multi_agent_security.agents.triager import TriagerAgent
 from multi_agent_security.config import load_config
 from multi_agent_security.llm_client import LLMClient
 from multi_agent_security.memory.full_context import FullContextMemory
+from multi_agent_security.orchestration.blackboard import BlackboardOrchestrator
+from multi_agent_security.orchestration.hub_spoke import HubSpokeOrchestrator
 from multi_agent_security.orchestration.sequential import SequentialOrchestrator
 from multi_agent_security.tools.repo_cloner import RepoCloner
 from multi_agent_security.types import BenchmarkExample, EvalResult, TaskState
 from multi_agent_security.utils.logging import setup_logging
+
+_ORCHESTRATORS = {
+    "sequential": SequentialOrchestrator,
+    "hub_spoke": HubSpokeOrchestrator,
+    "blackboard": BlackboardOrchestrator,
+}
 
 
 def _build_orchestrator(config):
@@ -47,7 +55,13 @@ def _build_orchestrator(config):
         "reviewer": ReviewerAgent(config, llm_client),
     }
     memory = FullContextMemory()
-    return SequentialOrchestrator(config, agents, memory)
+    orch_class = _ORCHESTRATORS.get(config.architecture)
+    if orch_class is None:
+        raise ValueError(
+            f"Unknown architecture '{config.architecture}'. "
+            f"Valid options: {list(_ORCHESTRATORS)}"
+        )
+    return orch_class(config, agents, memory)
 
 
 async def run_single_repo(args) -> TaskState:
