@@ -1,1 +1,8 @@
+_base: default.yaml
 architecture: "blackboard"
+memory:
+  strategy: "full_context"
+  max_context_tokens: 4000
+orchestrator:
+  type: "rule_based"
+  conflict_resolution: "best_score"
