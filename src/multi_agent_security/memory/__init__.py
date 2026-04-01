@@ -22,6 +22,8 @@ def create_memory(config: AppConfig, llm_client=None):
             top_k=config.memory.retrieval_top_k,
             embedding_model=config.memory.embedding_model,
             embedding_provider=config.memory.embedding_provider,
+            aws_region=config.llm.aws_region,
+            aws_profile=config.llm.aws_profile,
         )
     else:
         raise ValueError(f"Unknown memory strategy: {strategy}")

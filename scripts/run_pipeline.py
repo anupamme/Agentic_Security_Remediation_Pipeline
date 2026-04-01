@@ -164,6 +164,14 @@ async def run_single_benchmark(args) -> EvalResult:
     cloner = RepoCloner()
     repo_path = cloner.clone(example.repo_url)
 
+    if repo_path is None:
+        print(
+            f"ERROR: Could not clone {example.repo_url}. "
+            "Check the URL, your network connection, or whether the repo is public.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     task_state = TaskState(
         task_id=run_id,
         repo_url=example.repo_url,

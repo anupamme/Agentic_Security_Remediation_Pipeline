@@ -39,15 +39,21 @@ class RetrievalMemory(BaseMemory):
     def __init__(
         self,
         top_k: int = 5,
-        embedding_model: str = "text-embedding-3-small",
+        embedding_model: str = "amazon.titan-embed-text-v2:0",
         embedding_provider: str = "local",
+        aws_region: Optional[str] = None,
+        aws_profile: Optional[str] = None,
     ):
         self.top_k = top_k
         self.embedding_model = embedding_model
         self.embedding_provider = embedding_provider
+        self.aws_region = aws_region
+        self.aws_profile = aws_profile
         self._entries: list[ScratchpadEntry] = []
         self._embeddings: list[list[float]] = []
         self._embedding_cache: dict[str, list[float]] = {}
+        self._openai_client = None  # Lazily initialised once on first API call
+        self._bedrock_client = None  # Lazily initialised once on first Bedrock call
 
     def store(self, message: AgentMessage) -> None:
         """Parse the agent message into structured scratchpad entries and embed each."""
@@ -215,7 +221,9 @@ class RetrievalMemory(BaseMemory):
         if text in self._embedding_cache:
             return self._embedding_cache[text]
 
-        if self.embedding_provider == "api":
+        if self.embedding_provider == "bedrock":
+            embedding = self._get_embedding_bedrock(text)
+        elif self.embedding_provider == "api":
             embedding = self._get_embedding_api(text)
         else:
             embedding = self._get_embedding_local(text)
@@ -240,13 +248,58 @@ class RetrievalMemory(BaseMemory):
             vec = [x / norm for x in vec]
         return vec
 
+    def _get_embedding_bedrock(self, text: str) -> list[float]:
+        """Bedrock-native embedding via boto3. Supports Titan and Cohere Embed models."""
+        try:
+            import boto3  # type: ignore
+
+            if self._bedrock_client is None:
+                session = boto3.Session(
+                    region_name=self.aws_region,
+                    profile_name=self.aws_profile,
+                )
+                self._bedrock_client = session.client("bedrock-runtime")
+
+            if self.embedding_model.startswith("amazon.titan"):
+                body = json.dumps({"inputText": text})
+                response = self._bedrock_client.invoke_model(
+                    modelId=self.embedding_model,
+                    body=body,
+                    contentType="application/json",
+                    accept="application/json",
+                )
+                result = json.loads(response["body"].read())
+                return result["embedding"]
+
+            elif self.embedding_model.startswith("cohere.embed"):
+                body = json.dumps({"texts": [text], "input_type": "search_document"})
+                response = self._bedrock_client.invoke_model(
+                    modelId=self.embedding_model,
+                    body=body,
+                    contentType="application/json",
+                    accept="application/json",
+                )
+                result = json.loads(response["body"].read())
+                return result["embeddings"][0]
+
+            else:
+                raise ValueError(f"Unsupported Bedrock embedding model: {self.embedding_model}")
+
+        except ImportError:
+            logger.warning("boto3 not installed; falling back to local embedding.")
+            return self._get_embedding_local(text)
+        except Exception as exc:
+            logger.warning("Bedrock embedding failed (%s); falling back to local embedding.", exc)
+            return self._get_embedding_local(text)
+
     def _get_embedding_api(self, text: str) -> list[float]:
         """API-based embedding. Requires OPENAI_API_KEY or equivalent."""
         try:
             import openai  # type: ignore
 
-            client = openai.OpenAI()
-            response = client.embeddings.create(input=text, model=self.embedding_model)
+            if self._openai_client is None:
+                self._openai_client = openai.OpenAI()
+            response = self._openai_client.embeddings.create(input=text, model=self.embedding_model)
             return response.data[0].embedding
         except ImportError:
             logger.warning(

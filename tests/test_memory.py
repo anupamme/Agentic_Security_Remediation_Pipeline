@@ -287,3 +287,147 @@ class TestCreateMemoryFactory:
         mem = create_memory(config)
         assert isinstance(mem, RetrievalMemory)
         assert mem.embedding_provider == "local"
+
+    def test_retrieval_wires_aws_credentials(self):
+        config = _make_config(strategy="retrieval")
+        # Inject aws_region/aws_profile via a custom AppConfig
+        from multi_agent_security.config import AppConfig
+        full_config = AppConfig.model_validate({
+            "memory": {"strategy": "retrieval", "retrieval_top_k": 5, "embedding_provider": "bedrock"},
+            "llm": {"provider": "bedrock", "aws_region": "us-east-1", "aws_profile": "myprofile"},
+        })
+        mem = create_memory(full_config)
+        assert isinstance(mem, RetrievalMemory)
+        assert mem.aws_region == "us-east-1"
+        assert mem.aws_profile == "myprofile"
+
+
+# ---------------------------------------------------------------------------
+# Bedrock embedding
+# ---------------------------------------------------------------------------
+
+class TestBedrockEmbedding:
+    def _make_boto3_mock(self, response_body: dict):
+        """Return a mock boto3 module with a pre-configured bedrock-runtime client."""
+        import io
+        from unittest.mock import MagicMock
+
+        mock_client = MagicMock()
+        mock_client.invoke_model.return_value = {
+            "body": io.BytesIO(json.dumps(response_body).encode())
+        }
+        mock_session = MagicMock()
+        mock_session.return_value.client.return_value = mock_client
+        mock_boto3 = MagicMock()
+        mock_boto3.Session = mock_session
+        return mock_boto3, mock_client, mock_session
+
+    def test_titan_happy_path(self):
+        import sys
+        from unittest.mock import patch
+
+        expected = [0.1, 0.2, 0.3]
+        mock_boto3, _, _ = self._make_boto3_mock({"embedding": expected})
+
+        mem = RetrievalMemory(
+            embedding_provider="bedrock",
+            embedding_model="amazon.titan-embed-text-v2:0",
+            aws_region="us-east-1",
+        )
+        with patch.dict(sys.modules, {"boto3": mock_boto3}):
+            result = mem._get_embedding_bedrock("sql injection")
+
+        assert result == expected
+
+    def test_cohere_happy_path(self):
+        import sys
+        from unittest.mock import patch
+
+        expected = [0.4, 0.5, 0.6]
+        mock_boto3, _, _ = self._make_boto3_mock({"embeddings": [expected]})
+
+        mem = RetrievalMemory(
+            embedding_provider="bedrock",
+            embedding_model="cohere.embed-english-v3",
+            aws_region="us-east-1",
+        )
+        with patch.dict(sys.modules, {"boto3": mock_boto3}):
+            result = mem._get_embedding_bedrock("sql injection")
+
+        assert result == expected
+
+    def test_fallback_on_invoke_model_failure(self):
+        import sys
+        from unittest.mock import MagicMock, patch
+
+        mock_client = MagicMock()
+        mock_client.invoke_model.side_effect = Exception("throttled")
+        mock_session = MagicMock()
+        mock_session.return_value.client.return_value = mock_client
+        mock_boto3 = MagicMock()
+        mock_boto3.Session = mock_session
+
+        mem = RetrievalMemory(
+            embedding_provider="bedrock",
+            embedding_model="amazon.titan-embed-text-v2:0",
+            aws_region="us-east-1",
+        )
+        with patch.dict(sys.modules, {"boto3": mock_boto3}):
+            result = mem._get_embedding_bedrock("test text")
+
+        assert isinstance(result, list)
+        assert len(result) == 256  # falls back to local _EMBEDDING_DIM
+
+    def test_fallback_when_boto3_missing(self):
+        import sys
+        from unittest.mock import patch
+
+        mem = RetrievalMemory(
+            embedding_provider="bedrock",
+            embedding_model="amazon.titan-embed-text-v2:0",
+        )
+        with patch.dict(sys.modules, {"boto3": None}):
+            result = mem._get_embedding_bedrock("test text")
+
+        assert isinstance(result, list)
+        assert len(result) == 256
+
+    def test_client_reused_across_calls(self):
+        import sys
+        from unittest.mock import patch
+        import io
+
+        mock_boto3, mock_client, mock_session = self._make_boto3_mock({"embedding": [0.1, 0.2]})
+        # Each invoke_model call returns a fresh BytesIO
+        mock_client.invoke_model.side_effect = lambda **kw: {
+            "body": io.BytesIO(json.dumps({"embedding": [0.1, 0.2]}).encode())
+        }
+
+        mem = RetrievalMemory(
+            embedding_provider="bedrock",
+            embedding_model="amazon.titan-embed-text-v2:0",
+            aws_region="us-west-2",
+        )
+        with patch.dict(sys.modules, {"boto3": mock_boto3}):
+            mem._get_embedding_bedrock("first text")
+            mem._get_embedding_bedrock("second text")
+
+        # Session should only be instantiated once
+        mock_session.assert_called_once()
+        assert mock_client.invoke_model.call_count == 2
+
+    def test_unsupported_model_falls_back_to_local(self):
+        import sys
+        from unittest.mock import patch
+
+        mock_boto3, _, _ = self._make_boto3_mock({})
+
+        mem = RetrievalMemory(
+            embedding_provider="bedrock",
+            embedding_model="unknown.model-v1",
+            aws_region="us-east-1",
+        )
+        with patch.dict(sys.modules, {"boto3": mock_boto3}):
+            result = mem._get_embedding_bedrock("test")
+
+        assert len(result) == 256  # local fallback

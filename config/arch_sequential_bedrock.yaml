@@ -1,8 +1,12 @@
-base: "default.yaml"                                                                                                                                                                                   
-architecture: "sequential"                                                                                                                                                                             
-memory:                                                                                                                                                                                                
-  strategy: "full_context"                                                                                                                                                                             
-llm:                                                                                                                                                                                                   
+base: "default.yaml"
+architecture: "sequential"
+memory:
+  strategy: "full_context"
+  # To use retrieval memory with Bedrock-native embeddings, set:
+  # strategy: "retrieval"
+  # embedding_provider: "bedrock"
+  # embedding_model: "amazon.titan-embed-text-v2:0"  # or "cohere.embed-english-v3"
+llm:
   provider: "bedrock"
-  model: "us.anthropic.claude-haiku-4-5-20251001-v1:0" 
+  model: "us.anthropic.claude-haiku-4-5-20251001-v1:0"
   aws_region: "us-west-2"
