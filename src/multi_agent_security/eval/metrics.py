@@ -71,18 +71,35 @@ def compute_triage_accuracy(
     predicted_triage: list[TriageResult],
     ground_truth_severity: VulnSeverity,
     ground_truth_vuln_type: VulnType,
+    predicted_vulns: list[Vulnerability] | None = None,
 ) -> float:
-    """Does the triager's severity match ground truth?"""
-    # Find triage result matching the ground truth vuln type
-    matching = None
-    for t in predicted_triage:
-        # Match by checking if the vuln_id references the right vuln type
-        # Since TriageResult has vuln_id not vuln_type, we pick the best severity match
-        matching = t
-        break  # Use first result if no type info available
+    """Does the triager's severity match ground truth?
+
+    Matches the triage result to the ground-truth vulnerability type by joining
+    TriageResult.vuln_id with Vulnerability.vuln_type via predicted_vulns.
+    Falls back to the closest-severity result when no type match is found.
+    """
+    if not predicted_triage:
+        return 0.0
+
+    matching: TriageResult | None = None
+
+    if predicted_vulns:
+        # Build vuln_id → vuln_type lookup from the scanner's output
+        vuln_type_by_id: dict[str, VulnType] = {v.id: v.vuln_type for v in predicted_vulns}
+        for t in predicted_triage:
+            if vuln_type_by_id.get(t.vuln_id) == ground_truth_vuln_type:
+                matching = t
+                break
 
     if matching is None:
-        return 0.0
+        # No predicted_vulns provided or no type match found — fall back to the
+        # triage result whose severity is closest to the ground truth.
+        gt_idx = _SEVERITY_ORDER.index(ground_truth_severity)
+        matching = min(
+            predicted_triage,
+            key=lambda t: abs(_SEVERITY_ORDER.index(t.severity) - gt_idx),
+        )
 
     gt_idx = _SEVERITY_ORDER.index(ground_truth_severity)
     pred_idx = _SEVERITY_ORDER.index(matching.severity)

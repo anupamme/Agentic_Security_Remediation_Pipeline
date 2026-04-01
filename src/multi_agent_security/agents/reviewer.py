@@ -34,6 +34,8 @@ Decision rules:
 
 If rejecting, provide a specific, actionable revision_request that tells the patcher exactly what to change.
 
+Keep review_reasoning under 80 words. Keep revision_request under 60 words — list specific changes only, no explanation.
+
 Respond with JSON only, matching the provided schema.\
 """
 

@@ -146,6 +146,46 @@ def test_triage_accuracy_off_by_two():
     assert score == 0.0
 
 
+def test_triage_accuracy_matches_by_vuln_type():
+    """With predicted_vulns, the correct triage entry is selected by vuln type, not position."""
+    vuln_sql = _make_vuln("app/a.py", VulnType.SQL_INJECTION)
+    vuln_xss = _make_vuln("app/b.py", VulnType.XSS)
+    # Two triage results: the SQL one is HIGH (matches GT), XSS one is LOW (wrong)
+    triage_sql = TriageResult(
+        vuln_id=vuln_sql.id, severity=VulnSeverity.HIGH,
+        exploitability_score=0.9, fix_strategy=FixStrategy.ONE_LINER,
+        estimated_complexity="low", triage_reasoning="r",
+    )
+    triage_xss = TriageResult(
+        vuln_id=vuln_xss.id, severity=VulnSeverity.LOW,
+        exploitability_score=0.3, fix_strategy=FixStrategy.ONE_LINER,
+        estimated_complexity="low", triage_reasoning="r",
+    )
+    # XSS is listed first — without predicted_vulns it would be picked (closest to HIGH=LOW→diff=3)
+    # With predicted_vulns, SQL triage should be selected (exact match)
+    score = compute_triage_accuracy(
+        [triage_xss, triage_sql], VulnSeverity.HIGH, VulnType.SQL_INJECTION,
+        predicted_vulns=[vuln_sql, vuln_xss],
+    )
+    assert score == 1.0
+
+
+def test_triage_accuracy_falls_back_when_no_type_match():
+    """Falls back to closest-severity when no vuln matches the ground truth type."""
+    vuln_xss = _make_vuln("app/b.py", VulnType.XSS)
+    triage_xss = TriageResult(
+        vuln_id=vuln_xss.id, severity=VulnSeverity.MEDIUM,
+        exploitability_score=0.5, fix_strategy=FixStrategy.ONE_LINER,
+        estimated_complexity="low", triage_reasoning="r",
+    )
+    # Ground truth is SQL_INJECTION but only XSS was triaged → falls back to closest severity
+    score = compute_triage_accuracy(
+        [triage_xss], VulnSeverity.HIGH, VulnType.SQL_INJECTION,
+        predicted_vulns=[vuln_xss],
+    )
+    assert score == 0.5  # MEDIUM vs HIGH = off by one
+
+
 def test_triage_accuracy_no_results():
     assert compute_triage_accuracy([], VulnSeverity.HIGH, VulnType.SQL_INJECTION) == 0.0
 

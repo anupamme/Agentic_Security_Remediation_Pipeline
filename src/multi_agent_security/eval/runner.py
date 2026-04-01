@@ -158,13 +158,29 @@ class EvalRunner:
             with open(jf) as f:
                 examples.append(BenchmarkExample.model_validate(json.load(f)))
 
+        # Clone each repo once, before dispatching any runs.
+        # RepoCloner caches by URL so this is a no-op for repos already on disk.
+        cloner = RepoCloner()
+        repo_paths: dict[str, Path] = {}
+        cloneable: list[BenchmarkExample] = []
+        for ex in examples:
+            path = cloner.clone(ex.repo_url)
+            if path is None:
+                print(
+                    f"WARNING: Could not clone {ex.repo_url} for {ex.id} — skipping",
+                    file=sys.stderr,
+                )
+            else:
+                repo_paths[ex.id] = path
+                cloneable.append(ex)
+
         semaphore = asyncio.Semaphore(parallel_workers)
         all_results: list[EvalResult] = []
 
         async def _run_with_semaphore(ex: BenchmarkExample, run_num: int) -> EvalResult | None:
             async with semaphore:
                 try:
-                    return await self._eval_single_example(ex, run_num)
+                    return await self._eval_single_example(ex, run_num, repo_paths[ex.id])
                 except Exception as exc:
                     print(f"ERROR: {ex.id} run {run_num}: {exc}", file=sys.stderr)
                     return EvalResult(
@@ -188,7 +204,7 @@ class EvalRunner:
 
         tasks = [
             _run_with_semaphore(ex, run_num)
-            for ex in examples
+            for ex in cloneable
             for run_num in range(1, num_runs + 1)
         ]
         results = await asyncio.gather(*tasks)
@@ -227,15 +243,11 @@ class EvalRunner:
         self,
         example: BenchmarkExample,
         run_number: int,
+        repo_path: Path,
     ) -> EvalResult:
         """Run pipeline on one example and compute all metrics."""
         cost_tracker = CostTracker()
         orchestrator, llm_client = _build_orchestrator(self._eval_config, cost_tracker)
-
-        cloner = RepoCloner()
-        repo_path = cloner.clone(example.repo_url)
-        if repo_path is None:
-            raise RuntimeError(f"Could not clone {example.repo_url}")
 
         task_state = TaskState(
             task_id=f"{example.id}-run{run_number}",
@@ -260,7 +272,8 @@ class EvalRunner:
 
         # Triage accuracy
         triage_accuracy = compute_triage_accuracy(
-            result.triage_results, example.severity, example.vuln_type
+            result.triage_results, example.severity, example.vuln_type,
+            predicted_vulns=result.vulnerabilities,
         )
 
         # Patch correctness
