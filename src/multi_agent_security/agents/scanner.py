@@ -5,7 +5,7 @@ import os
 from datetime import datetime, timezone
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from multi_agent_security.agents.base import BaseAgent
 from multi_agent_security.tools.static_analysis import (
@@ -77,6 +77,16 @@ class _VulnCandidate(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     code_snippet: str
     scanner_reasoning: str
+
+    @field_validator("vuln_type", mode="before")
+    @classmethod
+    def coerce_unknown_vuln_type(cls, v: object) -> object:
+        """Map any CWE not in VulnType to OTHER rather than raising."""
+        known = {m.value for m in VulnType}
+        if isinstance(v, str) and v not in known:
+            logger.warning("Unrecognised vuln_type %r — mapping to OTHER", v)
+            return VulnType.OTHER
+        return v
 
 
 class _LLMScanResult(BaseModel):
