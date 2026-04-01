@@ -31,7 +31,8 @@ class MemoryConfig(BaseModel):
     sliding_window_size: int = 10
     summary_model: str = "claude-sonnet-4-20250514"
     retrieval_top_k: int = 5
-    embedding_model: str = "voyage-3"
+    embedding_model: str = "amazon.titan-embed-text-v2:0"
+    embedding_provider: str = "local"  # "local" | "api" | "bedrock"
     max_context_tokens: int = 4000  # Max tokens per agent from blackboard (Architecture C)
 
 

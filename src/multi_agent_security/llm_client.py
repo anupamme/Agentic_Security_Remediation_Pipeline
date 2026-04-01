@@ -16,14 +16,18 @@ if TYPE_CHECKING:
 _DRY_RUN_CONTENT = '{"result": "dry_run_mock_response"}'
 
 _CODE_FENCE_RE = __import__("re").compile(
-    r"^\s*```(?:json)?\s*\n?(.*?)\n?\s*```\s*$", __import__("re").DOTALL
+    r"```(?:json)?\s*\n?(.*?)\n?\s*```", __import__("re").DOTALL
 )
 
 
 def _strip_json_fences(text: str) -> str:
-    """Strip markdown code fences (```json ... ``` or ``` ... ```) from LLM output."""
-    m = _CODE_FENCE_RE.match(text.strip())
-    return m.group(1).strip() if m else text
+    """Extract JSON from markdown code fences if present, otherwise return as-is.
+
+    Handles responses where the model wraps JSON in ```json...``` and optionally
+    appends explanatory text after the closing fence.
+    """
+    m = _CODE_FENCE_RE.search(text)
+    return m.group(1).strip() if m else text.strip()
 
 
 class LLMResponse(BaseModel):

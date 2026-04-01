@@ -184,27 +184,27 @@ def _base_task_state(repo_url: str = "local") -> TaskState:
 # ---------------------------------------------------------------------------
 
 class TestFullContextMemory:
-    def test_store_and_retrieve_returns_all(self):
+    async def test_store_and_retrieve_returns_all(self):
         mem = FullContextMemory()
         msg1 = _make_msg("scanner")
         msg2 = _make_msg("triager")
-        mem.store(msg1)
-        mem.store(msg2)
-        assert mem.retrieve("scanner") == [msg1, msg2]
-        assert mem.retrieve("patcher") == [msg1, msg2]
+        await mem.store(msg1)
+        await mem.store(msg2)
+        assert await mem.retrieve("scanner") == [msg1, msg2]
+        assert await mem.retrieve("patcher") == [msg1, msg2]
 
-    def test_clear_empties_memory(self):
+    async def test_clear_empties_memory(self):
         mem = FullContextMemory()
-        mem.store(_make_msg())
+        await mem.store(_make_msg())
         mem.clear()
-        assert mem.retrieve("scanner") == []
+        assert await mem.retrieve("scanner") == []
 
-    def test_retrieve_returns_copy(self):
+    async def test_retrieve_returns_copy(self):
         mem = FullContextMemory()
-        mem.store(_make_msg())
-        result = mem.retrieve("x")
+        await mem.store(_make_msg())
+        result = await mem.retrieve("x")
         result.clear()
-        assert len(mem.retrieve("x")) == 1  # original unchanged
+        assert len(await mem.retrieve("x")) == 1  # original unchanged
 
 
 # ---------------------------------------------------------------------------

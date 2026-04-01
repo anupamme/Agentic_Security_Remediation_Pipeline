@@ -500,7 +500,7 @@ class BlackboardOrchestrator(BaseOrchestrator):
 
         output, msg = await self._run_agent(agent, input_data, [bb_context])
         self._write_output_to_blackboard(agent.name, output, vuln_id)
-        self._record(task_state, msg)
+        await self._record(task_state, msg)
         return output, msg
 
     def _write_output_to_blackboard(
@@ -650,7 +650,7 @@ class BlackboardOrchestrator(BaseOrchestrator):
         except Exception:
             raise
 
-    def _record(self, task_state: TaskState, msg: AgentMessage) -> None:
+    async def _record(self, task_state: TaskState, msg: AgentMessage) -> None:
         """Store a message in both memory and task_state."""
-        self.memory.store(msg)
+        await self.memory.store(msg)
         task_state.messages.append(msg)

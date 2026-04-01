@@ -48,15 +48,16 @@ class SequentialOrchestrator(BaseOrchestrator):
             static_analysis_results=static_findings or None,
         )
         try:
+            scanner_context = await self.memory.retrieve("scanner")
             scanner_output, scanner_msg = await self._run_agent(
-                self.agents["scanner"], scanner_input, self.memory.retrieve("scanner")
+                self.agents["scanner"], scanner_input, scanner_context
             )
         except Exception as exc:
             logger.error("Scanner failed fatally: %s", exc, exc_info=True)
             task_state.status = "failed"
             return task_state
 
-        self._record(task_state, scanner_msg)
+        await self._record(task_state, scanner_msg)
         task_state.vulnerabilities = scanner_output.vulnerabilities
 
         if not scanner_output.vulnerabilities:
@@ -71,15 +72,16 @@ class SequentialOrchestrator(BaseOrchestrator):
             repo_metadata=repo_metadata,
         )
         try:
+            triager_context = await self.memory.retrieve("triager")
             triager_output, triager_msg = await self._run_agent(
-                self.agents["triager"], triager_input, self.memory.retrieve("triager")
+                self.agents["triager"], triager_input, triager_context
             )
         except Exception as exc:
             logger.error("Triager failed fatally: %s", exc, exc_info=True)
             task_state.status = "failed"
             return task_state
 
-        self._record(task_state, triager_msg)
+        await self._record(task_state, triager_msg)
         task_state.triage_results = triager_output.triage_results
 
         # --- Patch + Review loop ---
@@ -117,8 +119,9 @@ class SequentialOrchestrator(BaseOrchestrator):
                     previous_patch=previous_patch,
                 )
                 try:
+                    patcher_context = await self.memory.retrieve("patcher")
                     patcher_output, patcher_msg = await self._run_agent(
-                        self.agents["patcher"], patcher_input, self.memory.retrieve("patcher")
+                        self.agents["patcher"], patcher_input, patcher_context
                     )
                 except Exception as exc:
                     logger.error(
@@ -128,7 +131,7 @@ class SequentialOrchestrator(BaseOrchestrator):
                     task_state.failed_vulns.append(vuln_id)
                     break
 
-                self._record(task_state, patcher_msg)
+                await self._record(task_state, patcher_msg)
 
                 # Optional: run tests on patched code
                 test_result = None
@@ -154,8 +157,9 @@ class SequentialOrchestrator(BaseOrchestrator):
                     revision_number=attempt,
                 )
                 try:
+                    reviewer_context = await self.memory.retrieve("reviewer")
                     reviewer_output, reviewer_msg = await self._run_agent(
-                        self.agents["reviewer"], reviewer_input, self.memory.retrieve("reviewer")
+                        self.agents["reviewer"], reviewer_input, reviewer_context
                     )
                 except Exception as exc:
                     logger.error(
@@ -165,7 +169,7 @@ class SequentialOrchestrator(BaseOrchestrator):
                     task_state.failed_vulns.append(vuln_id)
                     break
 
-                self._record(task_state, reviewer_msg)
+                await self._record(task_state, reviewer_msg)
                 task_state.patches.append(patcher_output.patch)
                 task_state.reviews.append(reviewer_output.review)
 
@@ -213,7 +217,7 @@ class SequentialOrchestrator(BaseOrchestrator):
         except Exception:
             raise
 
-    def _record(self, task_state: TaskState, msg: AgentMessage) -> None:
+    async def _record(self, task_state: TaskState, msg: AgentMessage) -> None:
         """Store a message in both memory and task_state."""
-        self.memory.store(msg)
+        await self.memory.store(msg)
         task_state.messages.append(msg)
