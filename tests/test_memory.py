@@ -1,5 +1,4 @@
 """Tests for sliding window memory, retrieval memory, cosine similarity, and factory."""
-import asyncio
 import json
 from datetime import datetime, timezone
 
@@ -77,19 +76,19 @@ class TestCosineSimilarity:
 # ---------------------------------------------------------------------------
 
 class TestSlidingWindowMemory:
-    def test_below_window_no_summary(self):
+    async def test_below_window_no_summary(self):
         mem = SlidingWindowMemory(window_size=5, llm_client=None)
         for i in range(3):
-            mem.store(_make_message(content=f"msg {i}"))
+            await mem.store(_make_message(content=f"msg {i}"))
         result = mem.retrieve("scanner")
         assert len(result) == 3
         assert all(m.agent_name != "memory_summary" for m in result)
 
-    def test_window_enforcement_extractive(self):
+    async def test_window_enforcement_extractive(self):
         """Store 10 messages (window=3) → summary + last 3."""
         mem = SlidingWindowMemory(window_size=3, llm_client=None)
         for i in range(10):
-            mem.store(_make_message(content=f"message number {i}"))
+            await mem.store(_make_message(content=f"message number {i}"))
         result = mem.retrieve("scanner")
         # At most window_size + 1 summary entry
         window_msgs = [m for m in result if m.agent_name != "memory_summary"]
@@ -100,55 +99,49 @@ class TestSlidingWindowMemory:
         assert "message number 7" in window_msgs[0].content
         assert "message number 9" in window_msgs[2].content
 
-    def test_extractive_summary_content(self):
+    async def test_extractive_summary_content(self):
         """Summary should reference earlier messages."""
         mem = SlidingWindowMemory(window_size=2, llm_client=None)
-        mem.store(_make_message(agent_name="scanner", content="SQL injection found"))
-        mem.store(_make_message(agent_name="triager", content="high priority vuln"))
-        mem.store(_make_message(agent_name="patcher", content="patch generated"))
+        await mem.store(_make_message(agent_name="scanner", content="SQL injection found"))
+        await mem.store(_make_message(agent_name="triager", content="high priority vuln"))
+        await mem.store(_make_message(agent_name="patcher", content="patch generated"))
         result = mem.retrieve("reviewer")
         summary_msgs = [m for m in result if m.agent_name == "memory_summary"]
         assert summary_msgs, "Expected a summary message"
         summary_text = summary_msgs[0].content
         assert "SQL injection found" in summary_text or "scanner" in summary_text
 
-    def test_clear_resets_state(self):
+    async def test_clear_resets_state(self):
         mem = SlidingWindowMemory(window_size=3, llm_client=None)
         for i in range(5):
-            mem.store(_make_message(content=f"msg {i}"))
+            await mem.store(_make_message(content=f"msg {i}"))
         mem.clear()
         result = mem.retrieve("scanner")
         assert result == []
         assert mem._summary is None
         assert mem._summary_covers_up_to == 0
 
-    def test_async_summary_with_llm_client(self):
+    async def test_async_summary_with_llm_client(self):
         """With a dry-run LLM client, summarization should not raise."""
         from multi_agent_security.llm_client import LLMClient
         from multi_agent_security.config import LLMConfig
 
         llm = LLMClient(LLMConfig(), dry_run=True)
         mem = SlidingWindowMemory(window_size=2, llm_client=llm)
-
-        async def _run():
-            for i in range(5):
-                mem.store(_make_message(content=f"finding {i}"))
-            await mem._update_summary()
-
-        asyncio.run(_run())
+        for i in range(5):
+            await mem.store(_make_message(content=f"finding {i}"))
         result = mem.retrieve("reviewer")
         summary_msgs = [m for m in result if m.agent_name == "memory_summary"]
         assert summary_msgs, "Expected a summary after LLM summarization"
 
-    def test_no_duplicate_summarization(self):
+    async def test_no_duplicate_summarization(self):
         """_update_summary should not re-summarize already-covered range."""
         mem = SlidingWindowMemory(window_size=2, llm_client=None)
         for i in range(4):
-            mem.store(_make_message(content=f"msg {i}"))
-        original_summary = mem._summary
+            await mem.store(_make_message(content=f"msg {i}"))
         original_covers = mem._summary_covers_up_to
         # Manually calling again should be a no-op (already covered)
-        asyncio.run(mem._update_summary())
+        await mem._update_summary()
         assert mem._summary_covers_up_to == original_covers
 
 
@@ -157,7 +150,7 @@ class TestSlidingWindowMemory:
 # ---------------------------------------------------------------------------
 
 class TestRetrievalMemory:
-    def _store_varied_messages(self, mem: RetrievalMemory) -> None:
+    async def _store_varied_messages(self, mem: RetrievalMemory) -> None:
         messages = [
             ("scanner", '{"vulnerabilities": [{"id": "V1", "vuln_type": "sql_injection", "file_path": "app.py", "description": "SQL injection via user input", "severity": "high"}]}'),
             ("scanner", '{"vulnerabilities": [{"id": "V2", "vuln_type": "xss", "file_path": "view.py", "description": "Cross-site scripting in template", "severity": "medium"}]}'),
@@ -171,19 +164,19 @@ class TestRetrievalMemory:
             ("triager", "authentication bypass vulnerability in login form"),
         ]
         for agent, content in messages:
-            mem.store(_make_message(agent_name=agent, content=content))
+            await mem.store(_make_message(agent_name=agent, content=content))
 
-    def test_relevance_ordering_sql_injection(self):
+    async def test_relevance_ordering_sql_injection(self):
         mem = RetrievalMemory(top_k=3, embedding_provider="local")
-        self._store_varied_messages(mem)
+        await self._store_varied_messages(mem)
         results = mem.retrieve("patcher", query="SQL injection vulnerability fix")
         assert results, "Expected at least one result"
         combined = " ".join(r.content.lower() for r in results)
         assert "sql" in combined or "injection" in combined
 
-    def test_top_k_capped(self):
+    async def test_top_k_capped(self):
         mem = RetrievalMemory(top_k=3, embedding_provider="local")
-        self._store_varied_messages(mem)
+        await self._store_varied_messages(mem)
         results = mem.retrieve("scanner")
         assert len(results) <= 3
 
@@ -191,9 +184,9 @@ class TestRetrievalMemory:
         mem = RetrievalMemory(top_k=5, embedding_provider="local")
         assert mem.retrieve("scanner") == []
 
-    def test_clear_resets_state(self):
+    async def test_clear_resets_state(self):
         mem = RetrievalMemory(top_k=5, embedding_provider="local")
-        self._store_varied_messages(mem)
+        await self._store_varied_messages(mem)
         mem.clear()
         assert mem.retrieve("scanner") == []
         assert mem._entries == []
@@ -235,11 +228,11 @@ class TestRetrievalMemory:
         assert entries[0].entry_type == "summary"
         assert entries[0].content == "plain text not json"
 
-    def test_default_query_used_when_none(self):
+    async def test_default_query_used_when_none(self):
         """retrieve() with query=None should use DEFAULT_QUERIES."""
         from multi_agent_security.memory.retrieval import DEFAULT_QUERIES
         mem = RetrievalMemory(top_k=2, embedding_provider="local")
-        mem.store(_make_message(agent_name="scanner", content="vuln found"))
+        await mem.store(_make_message(agent_name="scanner", content="vuln found"))
         # Should not raise; uses default query for "patcher"
         results = mem.retrieve("patcher", query=None)
         assert isinstance(results, list)

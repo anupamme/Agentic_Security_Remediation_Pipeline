@@ -6,7 +6,7 @@ from multi_agent_security.types import AgentMessage
 
 class BaseMemory(ABC):
     @abstractmethod
-    def store(self, message: AgentMessage) -> None:
+    async def store(self, message: AgentMessage) -> None:
         """Store a new agent message."""
         ...
 

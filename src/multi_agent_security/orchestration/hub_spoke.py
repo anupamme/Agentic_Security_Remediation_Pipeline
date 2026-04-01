@@ -154,7 +154,7 @@ class HubSpokeOrchestrator(BaseOrchestrator):
             task_state.status = "failed"
             return task_state
 
-        self._record(task_state, scanner_msg)
+        await self._record(task_state, scanner_msg)
         task_state.vulnerabilities = scanner_output.vulnerabilities
 
         if not scanner_output.vulnerabilities:
@@ -179,7 +179,7 @@ class HubSpokeOrchestrator(BaseOrchestrator):
             task_state.status = "failed"
             return task_state
 
-        self._record(task_state, triager_msg)
+        await self._record(task_state, triager_msg)
         task_state.triage_results = triager_output.triage_results
 
         # --- Patch + Review loop ---
@@ -229,7 +229,7 @@ class HubSpokeOrchestrator(BaseOrchestrator):
                     task_state.failed_vulns.append(vuln_id)
                     break
 
-                self._record(task_state, patcher_msg)
+                await self._record(task_state, patcher_msg)
 
                 # Optional: run tests on patched code
                 test_result = None
@@ -267,7 +267,7 @@ class HubSpokeOrchestrator(BaseOrchestrator):
                     task_state.failed_vulns.append(vuln_id)
                     break
 
-                self._record(task_state, reviewer_msg)
+                await self._record(task_state, reviewer_msg)
                 task_state.patches.append(patcher_output.patch)
                 task_state.reviews.append(reviewer_output.review)
 
@@ -406,9 +406,9 @@ class HubSpokeOrchestrator(BaseOrchestrator):
         except Exception:
             raise
 
-    def _record(self, task_state: TaskState, msg: AgentMessage) -> None:
+    async def _record(self, task_state: TaskState, msg: AgentMessage) -> None:
         """Store a message in both memory and task_state."""
-        self.memory.store(msg)
+        await self.memory.store(msg)
         task_state.messages.append(msg)
 
     def _log_metrics(self) -> None:

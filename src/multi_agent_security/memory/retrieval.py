@@ -55,7 +55,7 @@ class RetrievalMemory(BaseMemory):
         self._openai_client = None  # Lazily initialised once on first API call
         self._bedrock_client = None  # Lazily initialised once on first Bedrock call
 
-    def store(self, message: AgentMessage) -> None:
+    async def store(self, message: AgentMessage) -> None:
         """Parse the agent message into structured scratchpad entries and embed each."""
         entries = self._parse_into_entries(message)
         for entry in entries:
