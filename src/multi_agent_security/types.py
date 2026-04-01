@@ -157,3 +157,61 @@ class EvalResult(BaseModel):
     revision_loops: int
     failure_stage: Optional[str] = None  # "scanner", "triager", "patcher", "reviewer", None
     failure_reason: Optional[str] = None
+    vuln_type: Optional[str] = None       # for grouping in aggregate_metrics
+    complexity_tag: Optional[str] = None  # for grouping in aggregate_metrics
+
+
+class MetricStats(BaseModel):
+    """Descriptive statistics for a single metric across multiple eval runs."""
+    mean: float
+    std: float
+    median: float
+    min: float
+    max: float
+
+
+class AggregateMetrics(BaseModel):
+    """Aggregated metrics across all eval examples."""
+    n_examples: int
+    detection_recall: MetricStats
+    detection_precision: MetricStats
+    triage_accuracy: MetricStats
+    patch_correctness: MetricStats
+    e2e_success_rate: float
+    total_cost_usd: MetricStats
+    total_tokens: MetricStats
+    latency_seconds: MetricStats
+    revision_loops: MetricStats
+    by_vuln_type: dict[str, "AggregateMetrics"] = {}
+    by_complexity: dict[str, "AggregateMetrics"] = {}
+
+
+class JudgeScore(BaseModel):
+    """LLM-as-judge score for a patch."""
+    correctness: float = Field(ge=0.0, le=1.0)
+    completeness: float = Field(ge=0.0, le=1.0)
+    safety: float = Field(ge=0.0, le=1.0)
+    reasoning: str
+
+
+class CalibrationResult(BaseModel):
+    """Judge calibration against human scores."""
+    pearson_r: float
+    spearman_r: float
+    mean_absolute_error: float
+    n_examples: int
+    per_example: list[dict]  # {"example_id", "human_score", "judge_score", "delta"}
+
+
+class EvalReport(BaseModel):
+    """Complete evaluation report for a benchmark run."""
+    run_id: str
+    config: dict[str, Any]
+    benchmark_split: str
+    num_examples: int
+    num_runs: int
+    aggregate_metrics: AggregateMetrics
+    per_example_results: list[EvalResult]
+    cost_summary: dict[str, Any]  # serialized RunCostSummary
+    judge_calibration: Optional[CalibrationResult] = None
+    timestamp: datetime
