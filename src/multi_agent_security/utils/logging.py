@@ -57,9 +57,15 @@ def generate_run_id(
     """
     Format: {arch}_{memory}_{benchmark_id or 'adhoc'}_{timestamp}
     Example: sequential_full_context_BENCH-0001_20250701T100000
+
+    Security: benchmark_id is sanitized to prevent path traversal attacks.
     """
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
-    bench = (benchmark_id or "adhoc").replace(" ", "_")
+    bench = benchmark_id or "adhoc"
+    # Sanitize benchmark_id: remove path separators and other problematic chars
+    bench = bench.replace("/", "_").replace("\\", "_").replace(" ", "_")
+    # Also remove any remaining path traversal attempts
+    bench = bench.replace("..", "_")
     return f"{architecture}_{memory}_{bench}_{timestamp}"
 
 

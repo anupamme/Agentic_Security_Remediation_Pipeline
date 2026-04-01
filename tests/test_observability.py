@@ -148,6 +148,28 @@ def test_generate_run_id_unique():
     assert id1 != id2
 
 
+def test_generate_run_id_sanitizes_path_traversal():
+    """Verify that path traversal attempts in benchmark_id are sanitized."""
+    # Test forward slash
+    run_id = generate_run_id("sequential", "full_context", benchmark_id="../../../etc/passwd")
+    assert "../" not in run_id
+    assert "/" not in run_id
+    assert "etc_passwd" in run_id
+
+    # Test backslash (Windows)
+    run_id = generate_run_id("sequential", "full_context", benchmark_id="..\\..\\..\\windows\\system32")
+    assert "..\\" not in run_id
+    assert "\\" not in run_id
+    assert "windows_system32" in run_id
+
+    # Test mixed
+    run_id = generate_run_id("sequential", "full_context", benchmark_id="../../tmp/../evil")
+    assert ".." not in run_id
+    assert "/" not in run_id
+    assert run_id.startswith("sequential_full_context_")
+    assert run_id.count("_") >= 6  # arch_mem_sanitized_parts_timestamp
+
+
 # ---------------------------------------------------------------------------
 # RunLogger tests
 # ---------------------------------------------------------------------------
