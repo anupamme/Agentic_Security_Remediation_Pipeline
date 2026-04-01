@@ -32,6 +32,7 @@ class MemoryConfig(BaseModel):
     summary_model: str = "claude-sonnet-4-20250514"
     retrieval_top_k: int = 5
     embedding_model: str = "voyage-3"
+    embedding_provider: str = "local"  # "local" | "api"
     max_context_tokens: int = 4000  # Max tokens per agent from blackboard (Architecture C)
 
 

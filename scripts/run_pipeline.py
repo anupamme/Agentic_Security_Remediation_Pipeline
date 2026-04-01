@@ -30,7 +30,7 @@ from multi_agent_security.agents.scanner import ScannerAgent
 from multi_agent_security.agents.triager import TriagerAgent
 from multi_agent_security.config import load_config
 from multi_agent_security.llm_client import LLMClient
-from multi_agent_security.memory.full_context import FullContextMemory
+from multi_agent_security.memory import create_memory
 from multi_agent_security.orchestration.blackboard import BlackboardOrchestrator
 from multi_agent_security.orchestration.hub_spoke import HubSpokeOrchestrator
 from multi_agent_security.orchestration.sequential import SequentialOrchestrator
@@ -90,7 +90,7 @@ def _build_orchestrator(config, cost_tracker=None):
         "patcher": PatcherAgent(config, llm_client),
         "reviewer": ReviewerAgent(config, llm_client),
     }
-    memory = FullContextMemory()
+    memory = create_memory(config, llm_client)
     orch_class = _ORCHESTRATORS.get(config.architecture)
     if orch_class is None:
         raise ValueError(
