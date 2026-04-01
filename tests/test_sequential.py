@@ -190,21 +190,21 @@ class TestFullContextMemory:
         msg2 = _make_msg("triager")
         await mem.store(msg1)
         await mem.store(msg2)
-        assert mem.retrieve("scanner") == [msg1, msg2]
-        assert mem.retrieve("patcher") == [msg1, msg2]
+        assert await mem.retrieve("scanner") == [msg1, msg2]
+        assert await mem.retrieve("patcher") == [msg1, msg2]
 
     async def test_clear_empties_memory(self):
         mem = FullContextMemory()
         await mem.store(_make_msg())
         mem.clear()
-        assert mem.retrieve("scanner") == []
+        assert await mem.retrieve("scanner") == []
 
     async def test_retrieve_returns_copy(self):
         mem = FullContextMemory()
         await mem.store(_make_msg())
-        result = mem.retrieve("x")
+        result = await mem.retrieve("x")
         result.clear()
-        assert len(mem.retrieve("x")) == 1  # original unchanged
+        assert len(await mem.retrieve("x")) == 1  # original unchanged
 
 
 # ---------------------------------------------------------------------------

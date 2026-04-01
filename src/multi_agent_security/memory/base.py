@@ -11,7 +11,7 @@ class BaseMemory(ABC):
         ...
 
     @abstractmethod
-    def retrieve(
+    async def retrieve(
         self, agent_name: str, query: Optional[str] = None
     ) -> list[AgentMessage]:
         """Retrieve relevant context for the given agent."""

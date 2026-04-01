@@ -51,7 +51,7 @@ class SlidingWindowMemory(BaseMemory):
         if messages_outside_window > self._summary_covers_up_to:
             await self._update_summary()
 
-    def retrieve(self, agent_name: str, query: Optional[str] = None) -> list[AgentMessage]:
+    async def retrieve(self, agent_name: str, query: Optional[str] = None) -> list[AgentMessage]:
         """Return [summary_as_message] + last N messages."""
         context: list[AgentMessage] = []
         if self._summary:

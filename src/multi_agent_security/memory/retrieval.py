@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import json
 import math
@@ -20,7 +21,23 @@ DEFAULT_QUERIES: dict[str, str] = {
     "reviewer": "code patch to review for security correctness and quality",
 }
 
-_EMBEDDING_DIM = 256
+_EMBEDDING_DIM = 256  # Default dimension for the local hash-based provider
+
+# Known output dimensions for remote embedding models.
+# Used to ensure the local fallback vector matches the expected dimension so
+# cosine_similarity is never called with vectors of different lengths.
+_MODEL_DIMS: dict[str, int] = {
+    # Amazon Titan
+    "amazon.titan-embed-text-v1": 1536,
+    "amazon.titan-embed-text-v2:0": 1024,
+    # Cohere (Bedrock and direct)
+    "cohere.embed-english-v3": 1024,
+    "cohere.embed-multilingual-v3": 1024,
+    # OpenAI
+    "text-embedding-3-small": 1536,
+    "text-embedding-3-large": 3072,
+    "text-embedding-ada-002": 1536,
+}
 
 
 class ScratchpadEntry(BaseModel):
@@ -59,11 +76,11 @@ class RetrievalMemory(BaseMemory):
         """Parse the agent message into structured scratchpad entries and embed each."""
         entries = self._parse_into_entries(message)
         for entry in entries:
-            embedding = self._get_embedding(entry.content)
+            embedding = await asyncio.to_thread(self._get_embedding, entry.content)
             self._entries.append(entry)
             self._embeddings.append(embedding)
 
-    def retrieve(self, agent_name: str, query: Optional[str] = None) -> list[AgentMessage]:
+    async def retrieve(self, agent_name: str, query: Optional[str] = None) -> list[AgentMessage]:
         """Find top_k most similar entries by cosine similarity and return as AgentMessages."""
         if not self._entries:
             return []
@@ -71,7 +88,7 @@ class RetrievalMemory(BaseMemory):
         if query is None:
             query = DEFAULT_QUERIES.get(agent_name, agent_name)
 
-        query_embedding = self._get_embedding(query)
+        query_embedding = await asyncio.to_thread(self._get_embedding, query)
         similarities = [cosine_similarity(query_embedding, e) for e in self._embeddings]
         top_indices = sorted(
             range(len(similarities)), key=lambda i: similarities[i], reverse=True
@@ -231,16 +248,28 @@ class RetrievalMemory(BaseMemory):
         self._embedding_cache[text] = embedding
         return embedding
 
-    def _get_embedding_local(self, text: str) -> list[float]:
+    def _fallback_dim(self) -> int:
+        """Return the vector dimension expected for the configured model.
+
+        When the primary provider fails and we fall back to local hashing, we
+        must produce a vector of this length so that cosine_similarity is never
+        called with mismatched dimensions (zip truncates silently, which corrupts
+        the dot product while the norms are computed on the full vectors).
+        """
+        if self.embedding_provider == "local":
+            return _EMBEDDING_DIM
+        return _MODEL_DIMS.get(self.embedding_model, _EMBEDDING_DIM)
+
+    def _get_embedding_local(self, text: str, dim: int = _EMBEDDING_DIM) -> list[float]:
         """Bag-of-words hash embedding into a fixed-dim vector. No external deps."""
         import re
 
         tokens = re.findall(r"[a-zA-Z0-9]+", text.lower())
-        vec = [0.0] * _EMBEDDING_DIM
+        vec = [0.0] * dim
         for token in tokens:
             # Use SHA-256 to map token to a bucket index
             digest = hashlib.sha256(token.encode()).digest()
-            idx = int.from_bytes(digest[:4], "big") % _EMBEDDING_DIM
+            idx = int.from_bytes(digest[:4], "big") % dim
             vec[idx] += 1.0
 
         norm = math.sqrt(sum(x * x for x in vec))
@@ -287,10 +316,10 @@ class RetrievalMemory(BaseMemory):
 
         except ImportError:
             logger.warning("boto3 not installed; falling back to local embedding.")
-            return self._get_embedding_local(text)
+            return self._get_embedding_local(text, dim=self._fallback_dim())
         except Exception as exc:
             logger.warning("Bedrock embedding failed (%s); falling back to local embedding.", exc)
-            return self._get_embedding_local(text)
+            return self._get_embedding_local(text, dim=self._fallback_dim())
 
     def _get_embedding_api(self, text: str) -> list[float]:
         """API-based embedding. Requires OPENAI_API_KEY or equivalent."""
@@ -306,7 +335,7 @@ class RetrievalMemory(BaseMemory):
                 "openai package not installed; falling back to local embedding. "
                 "Install openai or set embedding_provider=local."
             )
-            return self._get_embedding_local(text)
+            return self._get_embedding_local(text, dim=self._fallback_dim())
         except Exception as exc:
             logger.warning("API embedding failed (%s); falling back to local embedding.", exc)
-            return self._get_embedding_local(text)
+            return self._get_embedding_local(text, dim=self._fallback_dim())

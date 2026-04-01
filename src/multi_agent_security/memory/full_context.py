@@ -13,7 +13,7 @@ class FullContextMemory(BaseMemory):
     async def store(self, message: AgentMessage) -> None:
         self._messages.append(message)
 
-    def retrieve(self, agent_name: str, query: Optional[str] = None) -> list[AgentMessage]:
+    async def retrieve(self, agent_name: str, query: Optional[str] = None) -> list[AgentMessage]:
         """Return ALL messages. No filtering."""
         return list(self._messages)
 

@@ -80,7 +80,7 @@ class TestSlidingWindowMemory:
         mem = SlidingWindowMemory(window_size=5, llm_client=None)
         for i in range(3):
             await mem.store(_make_message(content=f"msg {i}"))
-        result = mem.retrieve("scanner")
+        result = await mem.retrieve("scanner")
         assert len(result) == 3
         assert all(m.agent_name != "memory_summary" for m in result)
 
@@ -89,7 +89,7 @@ class TestSlidingWindowMemory:
         mem = SlidingWindowMemory(window_size=3, llm_client=None)
         for i in range(10):
             await mem.store(_make_message(content=f"message number {i}"))
-        result = mem.retrieve("scanner")
+        result = await mem.retrieve("scanner")
         # At most window_size + 1 summary entry
         window_msgs = [m for m in result if m.agent_name != "memory_summary"]
         summary_msgs = [m for m in result if m.agent_name == "memory_summary"]
@@ -105,7 +105,7 @@ class TestSlidingWindowMemory:
         await mem.store(_make_message(agent_name="scanner", content="SQL injection found"))
         await mem.store(_make_message(agent_name="triager", content="high priority vuln"))
         await mem.store(_make_message(agent_name="patcher", content="patch generated"))
-        result = mem.retrieve("reviewer")
+        result = await mem.retrieve("reviewer")
         summary_msgs = [m for m in result if m.agent_name == "memory_summary"]
         assert summary_msgs, "Expected a summary message"
         summary_text = summary_msgs[0].content
@@ -116,7 +116,7 @@ class TestSlidingWindowMemory:
         for i in range(5):
             await mem.store(_make_message(content=f"msg {i}"))
         mem.clear()
-        result = mem.retrieve("scanner")
+        result = await mem.retrieve("scanner")
         assert result == []
         assert mem._summary is None
         assert mem._summary_covers_up_to == 0
@@ -130,7 +130,7 @@ class TestSlidingWindowMemory:
         mem = SlidingWindowMemory(window_size=2, llm_client=llm)
         for i in range(5):
             await mem.store(_make_message(content=f"finding {i}"))
-        result = mem.retrieve("reviewer")
+        result = await mem.retrieve("reviewer")
         summary_msgs = [m for m in result if m.agent_name == "memory_summary"]
         assert summary_msgs, "Expected a summary after LLM summarization"
 
@@ -169,7 +169,7 @@ class TestRetrievalMemory:
     async def test_relevance_ordering_sql_injection(self):
         mem = RetrievalMemory(top_k=3, embedding_provider="local")
         await self._store_varied_messages(mem)
-        results = mem.retrieve("patcher", query="SQL injection vulnerability fix")
+        results = await mem.retrieve("patcher", query="SQL injection vulnerability fix")
         assert results, "Expected at least one result"
         combined = " ".join(r.content.lower() for r in results)
         assert "sql" in combined or "injection" in combined
@@ -177,18 +177,18 @@ class TestRetrievalMemory:
     async def test_top_k_capped(self):
         mem = RetrievalMemory(top_k=3, embedding_provider="local")
         await self._store_varied_messages(mem)
-        results = mem.retrieve("scanner")
+        results = await mem.retrieve("scanner")
         assert len(results) <= 3
 
-    def test_empty_store_returns_empty(self):
+    async def test_empty_store_returns_empty(self):
         mem = RetrievalMemory(top_k=5, embedding_provider="local")
-        assert mem.retrieve("scanner") == []
+        assert await mem.retrieve("scanner") == []
 
     async def test_clear_resets_state(self):
         mem = RetrievalMemory(top_k=5, embedding_provider="local")
         await self._store_varied_messages(mem)
         mem.clear()
-        assert mem.retrieve("scanner") == []
+        assert await mem.retrieve("scanner") == []
         assert mem._entries == []
         assert mem._embeddings == []
         assert mem._embedding_cache == {}
@@ -234,7 +234,7 @@ class TestRetrievalMemory:
         mem = RetrievalMemory(top_k=2, embedding_provider="local")
         await mem.store(_make_message(agent_name="scanner", content="vuln found"))
         # Should not raise; uses default query for "patcher"
-        results = mem.retrieve("patcher", query=None)
+        results = await mem.retrieve("patcher", query=None)
         assert isinstance(results, list)
 
 
@@ -369,7 +369,7 @@ class TestBedrockEmbedding:
             result = mem._get_embedding_bedrock("test text")
 
         assert isinstance(result, list)
-        assert len(result) == 256  # falls back to local _EMBEDDING_DIM
+        assert len(result) == 1024  # fallback matches titan-embed-text-v2:0 dimension
 
     def test_fallback_when_boto3_missing(self):
         import sys
@@ -383,7 +383,7 @@ class TestBedrockEmbedding:
             result = mem._get_embedding_bedrock("test text")
 
         assert isinstance(result, list)
-        assert len(result) == 256
+        assert len(result) == 1024  # fallback matches titan-embed-text-v2:0 dimension
 
     def test_client_reused_across_calls(self):
         import sys

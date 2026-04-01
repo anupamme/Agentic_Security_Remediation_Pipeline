@@ -48,8 +48,9 @@ class SequentialOrchestrator(BaseOrchestrator):
             static_analysis_results=static_findings or None,
         )
         try:
+            scanner_context = await self.memory.retrieve("scanner")
             scanner_output, scanner_msg = await self._run_agent(
-                self.agents["scanner"], scanner_input, self.memory.retrieve("scanner")
+                self.agents["scanner"], scanner_input, scanner_context
             )
         except Exception as exc:
             logger.error("Scanner failed fatally: %s", exc, exc_info=True)
@@ -71,8 +72,9 @@ class SequentialOrchestrator(BaseOrchestrator):
             repo_metadata=repo_metadata,
         )
         try:
+            triager_context = await self.memory.retrieve("triager")
             triager_output, triager_msg = await self._run_agent(
-                self.agents["triager"], triager_input, self.memory.retrieve("triager")
+                self.agents["triager"], triager_input, triager_context
             )
         except Exception as exc:
             logger.error("Triager failed fatally: %s", exc, exc_info=True)
@@ -117,8 +119,9 @@ class SequentialOrchestrator(BaseOrchestrator):
                     previous_patch=previous_patch,
                 )
                 try:
+                    patcher_context = await self.memory.retrieve("patcher")
                     patcher_output, patcher_msg = await self._run_agent(
-                        self.agents["patcher"], patcher_input, self.memory.retrieve("patcher")
+                        self.agents["patcher"], patcher_input, patcher_context
                     )
                 except Exception as exc:
                     logger.error(
@@ -154,8 +157,9 @@ class SequentialOrchestrator(BaseOrchestrator):
                     revision_number=attempt,
                 )
                 try:
+                    reviewer_context = await self.memory.retrieve("reviewer")
                     reviewer_output, reviewer_msg = await self._run_agent(
-                        self.agents["reviewer"], reviewer_input, self.memory.retrieve("reviewer")
+                        self.agents["reviewer"], reviewer_input, reviewer_context
                     )
                 except Exception as exc:
                     logger.error(
