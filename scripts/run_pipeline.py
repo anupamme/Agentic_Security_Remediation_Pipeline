@@ -19,7 +19,6 @@ import asyncio
 import json
 import os
 import sys
-import uuid
 from pathlib import Path
 
 # Ensure src/ is importable when run directly
@@ -37,7 +36,8 @@ from multi_agent_security.orchestration.hub_spoke import HubSpokeOrchestrator
 from multi_agent_security.orchestration.sequential import SequentialOrchestrator
 from multi_agent_security.tools.repo_cloner import RepoCloner
 from multi_agent_security.types import BenchmarkExample, EvalResult, TaskState
-from multi_agent_security.utils.logging import setup_logging
+from multi_agent_security.utils.cost_tracker import CostTracker
+from multi_agent_security.utils.logging import RunLogger, RunReporter, generate_run_id, setup_logging
 
 _ORCHESTRATORS = {
     "sequential": SequentialOrchestrator,
@@ -46,8 +46,44 @@ _ORCHESTRATORS = {
 }
 
 
-def _build_orchestrator(config):
-    llm_client = LLMClient(config.llm)
+def _log_agent_calls(run_logger, task_state, cost_tracker):
+    """Log one agent_call event per AgentMessage in task_state, matched to CostRecords."""
+    records = cost_tracker.get_records()
+    # Group records by agent_name for sequential matching
+    records_by_agent: dict = {}
+    for rec in records:
+        records_by_agent.setdefault(rec.agent_name, []).append(rec)
+    agent_indices: dict = {}
+
+    for msg in task_state.messages:
+        agent = msg.agent_name
+        idx = agent_indices.get(agent, 0)
+        agent_recs = records_by_agent.get(agent, [])
+        if idx < len(agent_recs):
+            cost_rec = agent_recs[idx]
+            agent_indices[agent] = idx + 1
+        else:
+            # Fallback: synthesize a CostRecord from AgentMessage
+            from multi_agent_security.utils.cost_tracker import CostRecord
+            cost_rec = CostRecord(
+                agent_name=agent,
+                model="unknown",
+                input_tokens=msg.token_count_input,
+                output_tokens=msg.token_count_output,
+                cost_usd=msg.cost_usd,
+                latency_ms=msg.latency_ms,
+                timestamp=msg.timestamp,
+            )
+        run_logger.log_agent_call(
+            agent=agent,
+            input_summary=f"{cost_rec.input_tokens} tokens",
+            output_summary=f"{cost_rec.output_tokens} tokens",
+            cost=cost_rec,
+        )
+
+
+def _build_orchestrator(config, cost_tracker=None):
+    llm_client = LLMClient(config.llm, cost_tracker=cost_tracker)
     agents = {
         "scanner": ScannerAgent(config, llm_client),
         "triager": TriagerAgent(config, llm_client),
@@ -68,7 +104,11 @@ async def run_single_repo(args) -> TaskState:
     config = load_config(args.config)
     setup_logging(config.logging.level)
 
-    orchestrator = _build_orchestrator(config)
+    run_id = generate_run_id(config.architecture, config.memory.strategy)
+    cost_tracker = CostTracker()
+    run_logger = RunLogger(run_id, output_dir=args.output_dir or "data/results")
+
+    orchestrator = _build_orchestrator(config, cost_tracker=cost_tracker)
 
     repo_path = args.repo
     if repo_path.startswith("http://") or repo_path.startswith("https://"):
@@ -88,12 +128,20 @@ async def run_single_repo(args) -> TaskState:
             sys.exit(1)
 
     task_state = TaskState(
-        task_id=str(uuid.uuid4()),
+        task_id=run_id,
         repo_url=args.repo,
         language=args.language,
     )
+
+    run_logger.log_run_start(config, benchmark_id=None)
     result = await orchestrator.run(repo_path, task_state)
+
+    cost_summary = cost_tracker.get_total_summary()
+    _log_agent_calls(run_logger, result, cost_tracker)
+    run_logger.log_run_end(result, cost_summary)
+
     print(result.model_dump_json(indent=2))
+    RunReporter.from_jsonl(str(run_logger.file_path)).print_summary()
     return result
 
 
@@ -107,25 +155,32 @@ async def run_single_benchmark(args) -> EvalResult:
         example_data = json.load(f)
     example = BenchmarkExample.model_validate(example_data)
 
-    orchestrator = _build_orchestrator(config)
+    run_id = generate_run_id(config.architecture, config.memory.strategy, benchmark_id=example.id)
+    cost_tracker = CostTracker()
+    run_logger = RunLogger(run_id, output_dir=args.output_dir or "data/results")
+
+    orchestrator = _build_orchestrator(config, cost_tracker=cost_tracker)
 
     cloner = RepoCloner()
     repo_path = cloner.clone(example.repo_url)
 
     task_state = TaskState(
-        task_id=str(uuid.uuid4()),
+        task_id=run_id,
         repo_url=example.repo_url,
         language=example.language,
     )
 
+    run_logger.log_run_start(config, benchmark_id=example.id)
     start = time.monotonic()
     result = await orchestrator.run(repo_path, task_state)
     elapsed = time.monotonic() - start
 
-    total_tokens = sum(
-        m.token_count_input + m.token_count_output for m in result.messages
-    )
-    total_cost = sum(m.cost_usd for m in result.messages)
+    cost_summary = cost_tracker.get_total_summary()
+    _log_agent_calls(run_logger, result, cost_tracker)
+    run_logger.log_run_end(result, cost_summary)
+
+    total_tokens = cost_summary.total_input_tokens + cost_summary.total_output_tokens
+    total_cost = cost_summary.total_cost_usd
 
     # Basic detection metrics: did we find the expected vuln type?
     found_types = {v.vuln_type for v in result.vulnerabilities}
@@ -162,6 +217,7 @@ async def run_single_benchmark(args) -> EvalResult:
     )
 
     print(eval_result.model_dump_json(indent=2))
+    RunReporter.from_jsonl(str(run_logger.file_path)).print_summary()
 
     if args.output_dir:
         out_dir = Path(args.output_dir)

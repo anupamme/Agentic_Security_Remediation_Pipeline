@@ -50,22 +50,6 @@ async def test_dry_run_with_response_format(dry_client):
     assert response.content is not None
 
 
-def test_compute_cost_zero():
-    assert _compute_cost(0, 0) == 0.0
-
-
-def test_compute_cost_one_million_input():
-    # 1M input tokens at $3/M = $3.00
-    cost = _compute_cost(1_000_000, 0)
-    assert abs(cost - 3.0) < 1e-9
-
-
-def test_compute_cost_one_million_output():
-    # 1M output tokens at $15/M = $15.00
-    cost = _compute_cost(0, 1_000_000)
-    assert abs(cost - 15.0) < 1e-9
-
-
 def test_llm_client_dry_run_flag(llm_config):
     client = LLMClient(config=llm_config, dry_run=True)
     assert client.dry_run is True

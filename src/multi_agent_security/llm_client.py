@@ -1,21 +1,17 @@
 import json
 import os
 import time
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import anthropic
 from pydantic import BaseModel
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from multi_agent_security.config import LLMConfig
+from multi_agent_security.utils.cost_tracker import PRICING
 
-# Pricing constants per million tokens.
-# Bedrock pricing mirrors Anthropic list price for Claude Sonnet;
-# update per https://aws.amazon.com/bedrock/pricing/ if needed.
-_PRICING: dict[str, dict[str, float]] = {
-    "anthropic": {"input": 3.0, "output": 15.0},
-    "bedrock": {"input": 3.0, "output": 15.0},
-}
+if TYPE_CHECKING:
+    from multi_agent_security.utils.cost_tracker import CostTracker
 
 _DRY_RUN_CONTENT = '{"result": "dry_run_mock_response"}'
 
@@ -40,14 +36,21 @@ class LLMResponse(BaseModel):
 
 
 class LLMClient:
-    def __init__(self, config: LLMConfig, dry_run: bool = False):
+    def __init__(
+        self,
+        config: LLMConfig,
+        dry_run: bool = False,
+        cost_tracker: Optional["CostTracker"] = None,
+    ):
         self.config = config
         self.dry_run = dry_run
+        self.cost_tracker = cost_tracker
         if not dry_run:
             if config.provider == "bedrock":
                 self._client = anthropic.AsyncAnthropicBedrock(
                     aws_region=config.aws_region,
                     aws_profile=config.aws_profile,
+                    timeout=anthropic.Timeout(connect=30.0, read=600.0, write=600.0, pool=600.0),
                 )
             else:
                 api_key = os.environ.get(config.api_key_env)
@@ -58,6 +61,7 @@ class LLMClient:
         system_prompt: str,
         user_prompt: str,
         response_format: Optional[type[BaseModel]] = None,
+        agent_name: str = "unknown",
     ) -> LLMResponse:
         """Make an LLM call.
 
@@ -74,9 +78,19 @@ class LLMClient:
             )
 
         if self.dry_run:
-            return self._mock_response(system_prompt, user_prompt, response_format)
+            response = self._mock_response(system_prompt, user_prompt, response_format)
+        else:
+            response = await self._call_with_retry(system_prompt, user_prompt, response_format)
 
-        return await self._call_with_retry(system_prompt, user_prompt, response_format)
+        if self.cost_tracker is not None:
+            self.cost_tracker.record(
+                agent_name,
+                response.model,
+                response.input_tokens,
+                response.output_tokens,
+                response.latency_ms,
+            )
+        return response
 
     def _mock_response(
         self,
@@ -91,7 +105,7 @@ class LLMClient:
             content = "This is a dry-run mock response."
         input_tokens = max(1, (len(system_prompt) + len(user_prompt)) // 4)
         output_tokens = max(1, len(content) // 4)
-        cost = _compute_cost(input_tokens, output_tokens, self.config.provider)
+        cost = _compute_cost(input_tokens, output_tokens, self.config.model)
         return LLMResponse(
             content=content,
             input_tokens=input_tokens,
@@ -142,7 +156,7 @@ class LLMClient:
         content = message.content[0].text if message.content else ""
         input_tokens = message.usage.input_tokens
         output_tokens = message.usage.output_tokens
-        cost = _compute_cost(input_tokens, output_tokens, self.config.provider)
+        cost = _compute_cost(input_tokens, output_tokens, self.config.model)
 
         return LLMResponse(
             content=content,
@@ -154,8 +168,7 @@ class LLMClient:
         )
 
 
-def _compute_cost(input_tokens: int, output_tokens: int, provider: str = "anthropic") -> float:
-    pricing = _PRICING.get(provider, _PRICING["anthropic"])
-    return (input_tokens / 1_000_000) * pricing["input"] + (
-        output_tokens / 1_000_000
-    ) * pricing["output"]
+def _compute_cost(input_tokens: int, output_tokens: int, model: str) -> float:
+    """Compute cost using the model-specific PRICING table from cost_tracker.py."""
+    pricing = PRICING.get(model, PRICING["default"])
+    return input_tokens * pricing["input"] + output_tokens * pricing["output"]

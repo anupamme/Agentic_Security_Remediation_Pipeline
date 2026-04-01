@@ -346,6 +346,7 @@ class ScannerAgent(BaseAgent):
             system_prompt=_SYSTEM_PROMPT,
             user_prompt=user_prompt,
             response_format=_LLMScanResult,
+            agent_name=type(self).name,
         )
 
         metrics = {
