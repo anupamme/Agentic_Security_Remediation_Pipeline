@@ -127,12 +127,22 @@ def compute_pareto_frontier(points: list[tuple[float, float]]) -> list[int]:
 # Statistical significance
 # ---------------------------------------------------------------------------
 
+def _mean_by_example(results: list) -> dict[str, float]:
+    """Average E2E success rate per example_id across all runs."""
+    accum: dict[str, list[float]] = {}
+    for r in results:
+        accum.setdefault(r.example_id, []).append(float(r.end_to_end_success))
+    return {eid: sum(vals) / len(vals) for eid, vals in accum.items()}
+
+
 def compute_significance_matrix(
     summaries: dict[str, ConfigSummary],
     alpha: float = 0.05,
 ) -> dict[tuple[str, str], tuple[bool, float]]:
     """
     Wilcoxon signed-rank test on paired per-example E2E outcomes.
+    When multiple runs exist for the same example, success rates are averaged
+    across runs before the paired test so no data is discarded.
     Returns {(id_a, id_b): (is_significant, p_value)} for all pairs i < j.
     """
     from scipy.stats import wilcoxon  # already in pyproject.toml
@@ -142,14 +152,8 @@ def compute_significance_matrix(
 
     for i, id_a in enumerate(config_ids):
         for id_b in config_ids[i + 1:]:
-            a_by_id = {
-                r.example_id: float(r.end_to_end_success)
-                for r in summaries[id_a].all_results
-            }
-            b_by_id = {
-                r.example_id: float(r.end_to_end_success)
-                for r in summaries[id_b].all_results
-            }
+            a_by_id = _mean_by_example(summaries[id_a].all_results)
+            b_by_id = _mean_by_example(summaries[id_b].all_results)
             shared = sorted(set(a_by_id) & set(b_by_id))
 
             if len(shared) < 10:

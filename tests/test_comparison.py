@@ -187,6 +187,35 @@ def test_significance_no_shared_examples():
     assert not is_sig
 
 
+def test_significance_multi_run_averages_not_overwritten():
+    """
+    With 3 runs per example, per-example success rates must be averaged across
+    runs rather than the last run overwriting previous ones.
+
+    Config A: 2 of 3 runs succeed for every example → mean = 0.667
+    Config B: always fails → mean = 0.0
+    The averaged signal should still be detected as significant, confirming all
+    run data contributes rather than just the final run.
+    """
+    ids = [f"ex-{i:02d}" for i in range(20)]
+    results_a = []
+    for eid in ids:
+        results_a.append(_make_eval_result(eid, True))   # run 1: success
+        results_a.append(_make_eval_result(eid, True))   # run 2: success
+        results_a.append(_make_eval_result(eid, False))  # run 3: failure
+    results_b = [_make_eval_result(eid, False) for eid in ids for _ in range(3)]
+
+    summaries = {
+        "CA": _make_summary("CA", results_a),
+        "CB": _make_summary("CB", results_b),
+    }
+    sig_matrix = compute_significance_matrix(summaries, alpha=0.05)
+    is_sig, p_val = sig_matrix[("CA", "CB")]
+    # Averaged A = 0.667, B = 0.0 for all examples — should be significant
+    assert is_sig
+    assert p_val < 0.05
+
+
 # ---------------------------------------------------------------------------
 # Table generation tests
 # ---------------------------------------------------------------------------
