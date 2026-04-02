@@ -156,7 +156,14 @@ class EvalRunner:
         examples = []
         for jf in json_files:
             with open(jf) as f:
-                examples.append(BenchmarkExample.model_validate(json.load(f)))
+                data = json.load(f)
+            try:
+                examples.append(BenchmarkExample.model_validate(data))
+            except Exception:
+                print(f"WARNING: skipping {jf.name} (not a valid BenchmarkExample)", file=sys.stderr)
+
+        if not examples:
+            raise ValueError(f"No valid BenchmarkExample files found in {benchmark_dir}")
 
         # Clone each repo once, before dispatching any runs.
         # Clones run concurrently in a thread pool so git network I/O does not
