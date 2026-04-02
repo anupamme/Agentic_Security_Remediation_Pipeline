@@ -159,20 +159,30 @@ class EvalRunner:
                 examples.append(BenchmarkExample.model_validate(json.load(f)))
 
         # Clone each repo once, before dispatching any runs.
-        # RepoCloner caches by URL so this is a no-op for repos already on disk.
+        # Clones run concurrently in a thread pool so git network I/O does not
+        # block the event loop. RepoCloner caches by URL so concurrent calls for
+        # the same URL are safe (dest.exists() short-circuits the second clone).
         cloner = RepoCloner()
+
+        async def _clone(ex: BenchmarkExample) -> tuple[str, Path | None]:
+            path = await asyncio.to_thread(cloner.clone, ex.repo_url)
+            return ex.id, path
+
+        clone_results = await asyncio.gather(*(_clone(ex) for ex in examples))
+
         repo_paths: dict[str, Path] = {}
         cloneable: list[BenchmarkExample] = []
-        for ex in examples:
-            path = cloner.clone(ex.repo_url)
+        id_to_example = {ex.id: ex for ex in examples}
+        for ex_id, path in clone_results:
             if path is None:
                 print(
-                    f"WARNING: Could not clone {ex.repo_url} for {ex.id} — skipping",
+                    f"WARNING: Could not clone {id_to_example[ex_id].repo_url} "
+                    f"for {ex_id} — skipping",
                     file=sys.stderr,
                 )
             else:
-                repo_paths[ex.id] = path
-                cloneable.append(ex)
+                repo_paths[ex_id] = path
+                cloneable.append(id_to_example[ex_id])
 
         semaphore = asyncio.Semaphore(parallel_workers)
         all_results: list[EvalResult] = []
