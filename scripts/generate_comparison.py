@@ -332,7 +332,7 @@ def write_failure_stages(
 
         success_pct = f"{100 * n_success / n_total:.1f}%" if n_total else "0%"
         lines.append(
-            f"| {cid} | {n_fail} "
+            f"| {cid} | {n_fail} | "
             + " | ".join(_pct(stage) for stage in known_stages)
             + f" | {success_pct} |"
         )
