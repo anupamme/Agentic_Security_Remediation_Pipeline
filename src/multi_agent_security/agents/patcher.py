@@ -34,10 +34,11 @@ Rules:
 2. **Preserve existing style.** Match the indentation, naming conventions, and patterns in the existing code.
 3. **Don't break functionality.** The patched code must do the same thing as the original, minus the vulnerability.
 4. **Consider the fix strategy.** The triager has recommended a strategy — follow it unless you have a strong reason not to.
-5. **Explain your reasoning.** Describe why your fix is correct and what attack vector it closes.
+5. **Explain your reasoning.** Keep patch_reasoning under 100 words — one short paragraph describing why the fix is correct.
 6. **Output the FULL patched file** in the `patched_code` field, not just the changed lines.
+7. **Keep test_suggestion and alternative_approaches brief** (one sentence each maximum).
 
-Respond with JSON only, matching the provided schema.\
+Respond with JSON only, matching the provided schema. Be concise in all string fields.\
 """
 
 _REVISION_SECTION = """
