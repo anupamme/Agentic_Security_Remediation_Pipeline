@@ -279,6 +279,92 @@ class TestSingleAgent:
         assert msg.agent_name == "single_agent"
 
     @pytest.mark.asyncio
+    async def test_single_agent_filtered_vuln_index_mapping(self, tmp_path):
+        """
+        Regression test: first LLM vuln has confidence < 0.5 and is filtered out.
+        triage/patch/review reference vuln_index=1 and vuln_index=2 (the two
+        surviving vulns in the original list).  IDs must map to the filtered list
+        — no IndexError and no off-by-one shift.
+        """
+        (tmp_path / "app.py").write_text(FIXTURES_DIR.joinpath("app.py").read_text())
+
+        llm_response_data = _SingleAgentLLMResponse(
+            vulnerabilities=[
+                # index 0 — low confidence, should be dropped
+                _RawVuln(
+                    file_path="app.py", line_start=1, line_end=1,
+                    vuln_type=VulnType.XSS, description="low-conf XSS",
+                    confidence=0.3, code_snippet="...", scanner_reasoning="maybe",
+                ),
+                # index 1 — kept → VULN-001
+                _RawVuln(
+                    file_path="app.py", line_start=7, line_end=7,
+                    vuln_type=VulnType.SQL_INJECTION, description="SQL injection",
+                    confidence=0.95, code_snippet='cursor.execute(f"...")',
+                    scanner_reasoning="f-string in SQL",
+                ),
+                # index 2 — kept → VULN-002
+                _RawVuln(
+                    file_path="app.py", line_start=20, line_end=20,
+                    vuln_type=VulnType.HARDCODED_CREDENTIALS, description="hardcoded secret",
+                    confidence=0.8, code_snippet='SECRET="abc"',
+                    scanner_reasoning="literal secret",
+                ),
+            ],
+            triage_results=[
+                # References original index 1 (SQL injection)
+                _RawTriage(vuln_index=1, severity=VulnSeverity.HIGH,
+                           exploitability_score=0.9, fix_strategy=FixStrategy.ONE_LINER,
+                           estimated_complexity="low", triage_reasoning="easy"),
+                # References original index 2 (hardcoded creds)
+                _RawTriage(vuln_index=2, severity=VulnSeverity.MEDIUM,
+                           exploitability_score=0.6, fix_strategy=FixStrategy.REFACTOR,
+                           estimated_complexity="medium", triage_reasoning="moderate"),
+            ],
+            patches=[
+                _RawPatch(vuln_index=1, file_path="app.py",
+                          original_code='cursor.execute(f"...")',
+                          patched_code='cursor.execute("...", (v,))',
+                          unified_diff="--- a\n+++ b\n", patch_reasoning="parameterise"),
+            ],
+            reviews=[
+                _RawReview(vuln_index=1, patch_accepted=True,
+                           correctness_score=0.9, security_score=0.95, style_score=0.8,
+                           review_reasoning="good", revision_request=None),
+            ],
+            summary="2 vulns after filtering.",
+        )
+
+        mock_llm = MagicMock()
+        mock_llm.complete = AsyncMock(return_value=LLMResponse(
+            content=llm_response_data.model_dump_json(),
+            input_tokens=400, output_tokens=200, latency_ms=800.0,
+            cost_usd=0.004, model="claude-sonnet-4-20250514",
+        ))
+
+        agent = SingleAgent(_make_config(), mock_llm)
+        output, _ = await agent.run(
+            SingleAgentInput(repo_path=str(tmp_path), target_files=["app.py"], language="python"),
+            context=[],
+        )
+
+        # Filtered list has 2 vulns with sequential IDs
+        assert len(output.vulnerabilities) == 2
+        assert output.vulnerabilities[0].id == "VULN-001"
+        assert output.vulnerabilities[1].id == "VULN-002"
+
+        # Triage maps to the correct vulns (not shifted by the filtered-out index 0)
+        assert len(output.triage_results) == 2
+        assert output.triage_results[0].vuln_id == "VULN-001"  # was orig index 1
+        assert output.triage_results[1].vuln_id == "VULN-002"  # was orig index 2
+
+        # Patch and review also resolve to VULN-001 (orig index 1)
+        assert len(output.patches) == 1
+        assert output.patches[0].vuln_id == "VULN-001"
+        assert len(output.reviews) == 1
+        assert output.reviews[0].vuln_id == "VULN-001"
+
+    @pytest.mark.asyncio
     async def test_single_agent_no_vulns(self, tmp_path):
         """LLM returns empty vulnerability list → output has empty lists."""
         (tmp_path / "app.py").write_text("def safe(): pass\n")

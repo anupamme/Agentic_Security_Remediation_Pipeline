@@ -182,65 +182,81 @@ class SingleAgent(BaseAgent):
 
             # Assign sequential IDs offset by previously accumulated vulns
             id_offset = len(all_vulns)
-            batch_vulns = [
-                Vulnerability(
-                    id=f"VULN-{id_offset + i + 1:03d}",
-                    file_path=rv.file_path,
-                    line_start=rv.line_start,
-                    line_end=rv.line_end,
-                    vuln_type=rv.vuln_type,
-                    description=rv.description,
-                    confidence=rv.confidence,
-                    code_snippet=rv.code_snippet,
-                    scanner_reasoning=rv.scanner_reasoning,
-                )
-                for i, rv in enumerate(parsed.vulnerabilities)
-                if rv.confidence >= 0.5
-            ]
+            # Map original LLM index → Vulnerability, skipping low-confidence items.
+            # We must preserve the original index as the key so that triage/patch/review
+            # vuln_index values (which reference the unfiltered LLM list) remain valid
+            # even when earlier items are dropped by the confidence filter.
+            orig_index_to_vuln: dict[int, Vulnerability] = {}
+            accepted_count = 0
+            for orig_idx, rv in enumerate(parsed.vulnerabilities):
+                if rv.confidence >= 0.5:
+                    orig_index_to_vuln[orig_idx] = Vulnerability(
+                        id=f"VULN-{id_offset + accepted_count + 1:03d}",
+                        file_path=rv.file_path,
+                        line_start=rv.line_start,
+                        line_end=rv.line_end,
+                        vuln_type=rv.vuln_type,
+                        description=rv.description,
+                        confidence=rv.confidence,
+                        code_snippet=rv.code_snippet,
+                        scanner_reasoning=rv.scanner_reasoning,
+                    )
+                    accepted_count += 1
+
+            batch_vulns = list(orig_index_to_vuln.values())
             all_vulns.extend(batch_vulns)
 
             for rt in parsed.triage_results:
-                idx = rt.vuln_index
-                if 0 <= idx < len(batch_vulns):
-                    all_triage.append(TriageResult(
-                        vuln_id=batch_vulns[idx].id,
-                        severity=rt.severity,
-                        exploitability_score=rt.exploitability_score,
-                        fix_strategy=rt.fix_strategy,
-                        estimated_complexity=rt.estimated_complexity,
-                        triage_reasoning=rt.triage_reasoning,
-                    ))
-                else:
-                    logger.warning("SingleAgent: triage vuln_index %d out of range", idx)
+                vuln = orig_index_to_vuln.get(rt.vuln_index)
+                if vuln is None:
+                    logger.warning(
+                        "SingleAgent: triage vuln_index %d filtered out or out of range",
+                        rt.vuln_index,
+                    )
+                    continue
+                all_triage.append(TriageResult(
+                    vuln_id=vuln.id,
+                    severity=rt.severity,
+                    exploitability_score=rt.exploitability_score,
+                    fix_strategy=rt.fix_strategy,
+                    estimated_complexity=rt.estimated_complexity,
+                    triage_reasoning=rt.triage_reasoning,
+                ))
 
             for rp in parsed.patches:
-                idx = rp.vuln_index
-                if 0 <= idx < len(batch_vulns):
-                    all_patches.append(Patch(
-                        vuln_id=batch_vulns[idx].id,
-                        file_path=rp.file_path,
-                        original_code=rp.original_code,
-                        patched_code=rp.patched_code,
-                        unified_diff=rp.unified_diff,
-                        patch_reasoning=rp.patch_reasoning,
-                    ))
-                else:
-                    logger.warning("SingleAgent: patch vuln_index %d out of range", idx)
+                vuln = orig_index_to_vuln.get(rp.vuln_index)
+                if vuln is None:
+                    logger.warning(
+                        "SingleAgent: patch vuln_index %d filtered out or out of range",
+                        rp.vuln_index,
+                    )
+                    continue
+                all_patches.append(Patch(
+                    vuln_id=vuln.id,
+                    file_path=rp.file_path,
+                    original_code=rp.original_code,
+                    patched_code=rp.patched_code,
+                    unified_diff=rp.unified_diff,
+                    patch_reasoning=rp.patch_reasoning,
+                ))
 
             for rr in parsed.reviews:
-                idx = rr.vuln_index
-                if 0 <= idx < len(batch_vulns):
-                    all_reviews.append(ReviewResult(
-                        vuln_id=batch_vulns[idx].id,
-                        patch_accepted=rr.patch_accepted,
-                        correctness_score=rr.correctness_score,
-                        security_score=rr.security_score,
-                        style_score=rr.style_score,
-                        review_reasoning=rr.review_reasoning,
-                        revision_request=rr.revision_request,
-                    ))
-                else:
-                    logger.warning("SingleAgent: review vuln_index %d out of range", idx)
+                vuln = orig_index_to_vuln.get(rr.vuln_index)
+                if vuln is None:
+                    logger.warning(
+                        "SingleAgent: review vuln_index %d filtered out or out of range",
+                        rr.vuln_index,
+                    )
+                    continue
+                all_reviews.append(ReviewResult(
+                    vuln_id=vuln.id,
+                    patch_accepted=rr.patch_accepted,
+                    correctness_score=rr.correctness_score,
+                    security_score=rr.security_score,
+                    style_score=rr.style_score,
+                    review_reasoning=rr.review_reasoning,
+                    revision_request=rr.revision_request,
+                ))
 
             summaries.append(parsed.summary)
 
