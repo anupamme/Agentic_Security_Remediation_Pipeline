@@ -3,7 +3,6 @@ import pytest
 from datetime import datetime, timezone
 
 from multi_agent_security.eval.failure_analysis import FailureClassifier, generate_recommendations
-from multi_agent_security.tools.test_runner import TestResult
 from multi_agent_security.types import (
     BenchmarkExample,
     EvalResult,
@@ -218,15 +217,14 @@ class TestClassifyFailure:
         assert FailureCategory.PATCHER_EMPTY_PATCH in categories
 
     def test_patcher_breaks_code(self):
-        """_classify_patch_failure with failing test → PATCHER_BREAKS_CODE."""
+        """_classify_patch_failure with tests_passed=False → PATCHER_BREAKS_CODE."""
         clf = FailureClassifier()
         patch = _make_patch()
-        test_result = TestResult(passed=False, output="FAILED test_app.py", tests_run=5, tests_failed=2)
         category = clf._classify_patch_failure(
             patch=patch,
             ground_truth_diff="--- a/app.py\n+++ b/app.py\n",
             review=None,
-            test_result=test_result,
+            tests_passed=False,
         )
         assert category == FailureCategory.PATCHER_BREAKS_CODE
 
@@ -253,7 +251,7 @@ class TestClassifyFailure:
             patch=patch,
             ground_truth_diff=ground_truth_diff,
             review=None,
-            test_result=None,
+            tests_passed=None,
         )
         assert category == FailureCategory.PATCHER_WRONG_FILE
 

@@ -11,7 +11,6 @@ from collections import Counter
 from typing import Optional
 
 from multi_agent_security.eval.metrics import compute_diff_similarity
-from multi_agent_security.tools.test_runner import TestResult
 from multi_agent_security.types import (
     BenchmarkExample,
     EvalResult,
@@ -152,21 +151,11 @@ class FailureClassifier:
                 (r for r in reversed(task_state.reviews) if r.vuln_id == best_patch.vuln_id),
                 None,
             )
-            # Reconstruct a minimal TestResult from the stored test_passed outcome so
-            # that PATCHER_BREAKS_CODE can be identified when tests were actually run.
-            tr: Optional[TestResult] = None
-            if eval_result.test_passed is not None:
-                tr = TestResult(
-                    passed=eval_result.test_passed,
-                    output="",
-                    tests_run=0,
-                    tests_failed=0 if eval_result.test_passed else 1,
-                )
             category = self._classify_patch_failure(
                 patch=best_patch,
                 ground_truth_diff=example.ground_truth_diff,
                 review=review,
-                test_result=tr,
+                tests_passed=eval_result.test_passed,
             )
             failures.append(FailureAnalysis(
                 example_id=example.id,
@@ -213,7 +202,7 @@ class FailureClassifier:
         patch: Patch,
         ground_truth_diff: str,
         review: Optional[ReviewResult],
-        test_result: Optional[TestResult],
+        tests_passed: Optional[bool],
     ) -> FailureCategory:
         """Determine specific patch failure category."""
         if not patch.unified_diff or not patch.unified_diff.strip():
@@ -224,7 +213,7 @@ class FailureClassifier:
         if gt_files and _normalize_path(patch.file_path) not in gt_files:
             return FailureCategory.PATCHER_WRONG_FILE
 
-        if test_result is not None and not test_result.passed:
+        if tests_passed is False:
             return FailureCategory.PATCHER_BREAKS_CODE
 
         if review is not None:
