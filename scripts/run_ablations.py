@@ -592,24 +592,33 @@ async def run_ablations(args) -> None:
               f"Cost: ${agg.total_cost_usd.mean:.4f}/ex")
 
     # --- Baseline results ---
-    baseline_config_id = args.baseline_config or "FULL"
+    # Determine the config ID under which baseline results will be stored.
+    # If a named config is requested and its reports are found on disk, use that
+    # name as the key.  If the load fails (or no --baseline-config was given),
+    # run the full sequential pipeline inline and store it under "FULL".
+    # baseline_config_id is set *after* we know which path was taken so that
+    # generate_ablation_report always receives a key that exists in results_by_config.
+    run_inline_baseline = True
 
     if args.baseline_config:
-        # Try to load from existing saved reports
         loaded = _load_baseline_from_reports(output_dir, args.baseline_config)
         if loaded:
             print(f"\nLoaded existing baseline results for {args.baseline_config} "
                   f"({len(loaded)} records)")
             results_by_config[args.baseline_config] = loaded
+            baseline_config_id = args.baseline_config
+            run_inline_baseline = False
         else:
             print(
                 f"\nWARNING: No saved results found for --baseline-config {args.baseline_config}. "
                 f"Running full sequential pipeline as baseline instead.",
                 file=sys.stderr,
             )
-            args.baseline_config = None  # fall through to inline run
+            baseline_config_id = "FULL"
+    else:
+        baseline_config_id = "FULL"
 
-    if not args.baseline_config:
+    if run_inline_baseline:
         print("\n=== Running full sequential pipeline (baseline) ===")
         baseline_results: list[EvalResult] = []
 
