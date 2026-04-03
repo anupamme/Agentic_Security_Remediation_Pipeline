@@ -17,7 +17,6 @@ Usage:
 
 import argparse
 import asyncio
-import json
 import sys
 from pathlib import Path
 
@@ -76,6 +75,7 @@ def _print_comparison_table(reports) -> None:
 async def run_calibration(args) -> None:
     """Run judge calibration against human-labeled data."""
     import json as _json
+
     from multi_agent_security.config import load_config
     from multi_agent_security.eval.judge import LLMJudge, calibrate_judge
     from multi_agent_security.llm_client import LLMClient

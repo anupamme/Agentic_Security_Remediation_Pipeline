@@ -9,7 +9,6 @@ Usage:
 
 import argparse
 import csv
-import io
 import json
 import random
 import sys

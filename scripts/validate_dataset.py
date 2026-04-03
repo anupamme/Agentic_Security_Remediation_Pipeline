@@ -10,7 +10,6 @@ Usage:
 """
 
 import argparse
-import json
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -20,7 +19,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from pydantic import ValidationError
 
 from multi_agent_security.types import BenchmarkExample, VulnType
-
 
 # ---------------------------------------------------------------------------
 # Loaders

@@ -17,7 +17,6 @@ Usage:
 import argparse
 import asyncio
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -37,7 +36,12 @@ from multi_agent_security.orchestration.sequential import SequentialOrchestrator
 from multi_agent_security.tools.repo_cloner import RepoCloner
 from multi_agent_security.types import BenchmarkExample, EvalResult, TaskState
 from multi_agent_security.utils.cost_tracker import CostTracker
-from multi_agent_security.utils.logging import RunLogger, RunReporter, generate_run_id, setup_logging
+from multi_agent_security.utils.logging import (
+    RunLogger,
+    RunReporter,
+    generate_run_id,
+    setup_logging,
+)
 
 _ORCHESTRATORS = {
     "sequential": SequentialOrchestrator,

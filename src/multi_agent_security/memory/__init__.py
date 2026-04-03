@@ -1,5 +1,3 @@
-from typing import Optional
-
 from multi_agent_security.config import AppConfig
 from multi_agent_security.memory.full_context import FullContextMemory
 from multi_agent_security.memory.retrieval import RetrievalMemory

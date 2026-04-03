@@ -31,7 +31,6 @@ from multi_agent_security.orchestration.hub_spoke import HubSpokeOrchestrator
 from multi_agent_security.orchestration.sequential import SequentialOrchestrator
 from multi_agent_security.tools.repo_cloner import RepoCloner
 from multi_agent_security.types import (
-    AggregateMetrics,
     BenchmarkExample,
     EvalReport,
     EvalResult,
@@ -139,7 +138,6 @@ class EvalRunner:
         parallel_workers: int = 1,
     ) -> EvalReport:
         """Run evaluation on all examples in benchmark_dir."""
-        import copy
         from multi_agent_security.config import AppConfig
 
         # Override architecture/memory in config

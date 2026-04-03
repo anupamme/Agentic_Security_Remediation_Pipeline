@@ -1,7 +1,8 @@
-from pydantic import BaseModel, Field, field_validator
+from datetime import datetime
 from enum import Enum
 from typing import Any, Optional
-from datetime import datetime, timezone
+
+from pydantic import BaseModel, Field, field_validator
 
 
 class VulnSeverity(str, Enum):

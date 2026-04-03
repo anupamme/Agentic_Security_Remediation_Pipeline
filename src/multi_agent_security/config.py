@@ -1,6 +1,7 @@
 import os
-import yaml
 from typing import Optional
+
+import yaml
 from pydantic import BaseModel, Field, model_validator
 
 

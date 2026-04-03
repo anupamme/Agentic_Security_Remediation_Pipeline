@@ -6,10 +6,10 @@ from typing import Optional
 import anthropic
 import pydantic
 
-from multi_agent_security.agents.patcher import PatcherInput, PatcherOutput
-from multi_agent_security.agents.reviewer import ReviewerInput, ReviewerOutput
-from multi_agent_security.agents.scanner import ScannerInput, ScannerOutput
-from multi_agent_security.agents.triager import TriagerInput, TriagerOutput
+from multi_agent_security.agents.patcher import PatcherInput
+from multi_agent_security.agents.reviewer import ReviewerInput
+from multi_agent_security.agents.scanner import ScannerInput
+from multi_agent_security.agents.triager import TriagerInput
 from multi_agent_security.orchestration.base import BaseOrchestrator
 from multi_agent_security.tools.code_parser import extract_repo_metadata
 from multi_agent_security.tools.static_analysis import run_dependency_audit, run_semgrep

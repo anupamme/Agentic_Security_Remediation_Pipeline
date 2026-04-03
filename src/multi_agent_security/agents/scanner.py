@@ -1,5 +1,4 @@
 import glob as _glob
-import json
 import logging
 import os
 from datetime import datetime, timezone

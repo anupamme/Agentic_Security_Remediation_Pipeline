@@ -8,17 +8,17 @@ import re
 import statistics
 from typing import Optional
 
+from multi_agent_security.tools.test_runner import TestResult
 from multi_agent_security.types import (
     AggregateMetrics,
     EvalResult,
     MetricStats,
+    Patch,
     TriageResult,
     Vulnerability,
     VulnSeverity,
     VulnType,
 )
-from multi_agent_security.tools.test_runner import TestResult
-from multi_agent_security.types import Patch
 
 _SEVERITY_ORDER = [
     VulnSeverity.INFO,
