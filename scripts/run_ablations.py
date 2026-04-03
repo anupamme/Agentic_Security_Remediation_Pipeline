@@ -159,12 +159,13 @@ async def _eval_single_example(
     judge_score: Optional[float] = None
     patch_correctness = 0.0
     if result.patches and example.ground_truth_diff:
-        # Prefer a patch whose file_path is in the ground-truth vulnerable files;
-        # fall back to the first patch if none match.
+        # Select the *last* patch for a ground-truth vulnerable file so that
+        # revision-loop refinements are preferred over the initial attempt.
+        # Fall back to the last patch overall if no file matches.
         gt_files = {f.lstrip("./") for f in example.vulnerable_files}
         best_patch = next(
-            (p for p in result.patches if p.file_path.lstrip("./") in gt_files),
-            result.patches[0],
+            (p for p in reversed(result.patches) if p.file_path.lstrip("./") in gt_files),
+            result.patches[-1],
         )
         # Also prefer the vuln for the same file when calling the judge.
         vuln_for_judge = next(
@@ -255,8 +256,8 @@ async def _eval_baseline_example(
     if result.patches and example.ground_truth_diff:
         gt_files = {f.lstrip("./") for f in example.vulnerable_files}
         best_patch = next(
-            (p for p in result.patches if p.file_path.lstrip("./") in gt_files),
-            result.patches[0],
+            (p for p in reversed(result.patches) if p.file_path.lstrip("./") in gt_files),
+            result.patches[-1],
         )
         vuln_for_judge = next(
             (v for v in result.vulnerabilities if v.file_path.lstrip("./") in gt_files),
