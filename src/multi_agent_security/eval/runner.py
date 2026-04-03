@@ -300,6 +300,7 @@ class EvalRunner:
 
         judge_score: float | None = None
         patch_correctness = 0.0
+        test_result = None
 
         if result.patches and example.ground_truth_diff:
             best_patch = result.patches[0]
@@ -321,7 +322,7 @@ class EvalRunner:
             patch_correctness = compute_patch_correctness(
                 generated_patch=best_patch,
                 ground_truth_diff=example.ground_truth_diff,
-                test_result=None,
+                test_result=test_result,
                 judge_score=judge_score,
             )
 
@@ -343,6 +344,7 @@ class EvalRunner:
             latency_seconds=elapsed,
             revision_loops=result.revision_count,
             failure_stage=result.status if result.status == "failed" else None,
+            test_passed=test_result.passed if test_result is not None else None,
             vuln_type=example.vuln_type.value,
             complexity_tag=example.complexity_tag,
         )

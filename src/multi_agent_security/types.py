@@ -36,6 +36,51 @@ class FixStrategy(str, Enum):
     MULTI_FILE = "multi_file"
 
 
+class FailureCategory(str, Enum):
+    # Scanner failures
+    SCANNER_MISS = "scanner_miss"
+    SCANNER_FALSE_POSITIVE = "scanner_fp"
+    SCANNER_WRONG_TYPE = "scanner_wrong_type"
+    SCANNER_PARSE_ERROR = "scanner_parse"
+    # Triager failures
+    TRIAGER_WRONG_SEVERITY = "triager_severity"
+    TRIAGER_WRONG_STRATEGY = "triager_strategy"
+    TRIAGER_PARSE_ERROR = "triager_parse"
+    # Patcher failures
+    PATCHER_EMPTY_PATCH = "patcher_empty"
+    PATCHER_WRONG_FILE = "patcher_wrong_file"
+    PATCHER_BREAKS_CODE = "patcher_breaks"
+    PATCHER_PARTIAL_FIX = "patcher_partial"
+    PATCHER_WRONG_APPROACH = "patcher_approach"
+    PATCHER_PARSE_ERROR = "patcher_parse"
+    # Reviewer failures
+    REVIEWER_FALSE_ACCEPT = "reviewer_false_accept"
+    REVIEWER_FALSE_REJECT = "reviewer_false_reject"
+    REVIEWER_UNHELPFUL_FEEDBACK = "reviewer_feedback"
+    REVIEWER_PARSE_ERROR = "reviewer_parse"
+    # System failures
+    CONTEXT_OVERFLOW = "context_overflow"
+    TIMEOUT = "timeout"
+    API_ERROR = "api_error"
+    MAX_RETRIES = "max_retries"
+    # Multi-agent coordination failures
+    INFO_LOSS = "info_loss"
+    CONFLICTING_AGENTS = "agent_conflict"
+    UNNECESSARY_REVISION = "unnecessary_revision"
+
+
+class FailureAnalysis(BaseModel):
+    """Classified failure for a single pipeline run."""
+    example_id: str
+    config_id: str
+    failure_category: FailureCategory
+    failure_stage: str   # "scanner" | "triager" | "patcher" | "reviewer" | "system"
+    severity: str        # "critical" | "minor"
+    description: str
+    root_cause: str
+    agent_outputs: dict[str, Any] = Field(default_factory=dict)
+
+
 class FileContext(BaseModel):
     """A single file's content and metadata."""
     path: str
@@ -157,6 +202,7 @@ class EvalResult(BaseModel):
     revision_loops: int
     failure_stage: Optional[str] = None  # "scanner", "triager", "patcher", "reviewer", None
     failure_reason: Optional[str] = None
+    test_passed: Optional[bool] = None   # True/False if tests were run; None if skipped
     vuln_type: Optional[str] = None       # for grouping in aggregate_metrics
     complexity_tag: Optional[str] = None  # for grouping in aggregate_metrics
 
