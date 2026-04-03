@@ -62,8 +62,8 @@ def validate_diff(diff: str) -> bool:
     lines = diff.splitlines()
 
     # Collect change lines, excluding the file header markers
-    added = [l for l in lines if l.startswith("+") and not l.startswith("+++")]
-    removed = [l for l in lines if l.startswith("-") and not l.startswith("---")]
+    added = [ln for ln in lines if ln.startswith("+") and not ln.startswith("+++")]
+    removed = [ln for ln in lines if ln.startswith("-") and not ln.startswith("---")]
 
     if not added and not removed:
         return False

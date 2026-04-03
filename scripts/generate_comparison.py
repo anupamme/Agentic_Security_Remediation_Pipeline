@@ -13,7 +13,6 @@ import statistics
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
@@ -226,7 +225,7 @@ def write_comparison_table(
             lines.append("- No pairs differ significantly.")
 
     (output_dir / "comparison_table.md").write_text("\n".join(lines) + "\n")
-    print(f"  Written: comparison_table.md")
+    print("  Written: comparison_table.md")
 
 
 # ---------------------------------------------------------------------------
@@ -266,7 +265,7 @@ def write_complexity_breakdown(
         lines.append("")
 
     (output_dir / "complexity_breakdown.md").write_text("\n".join(lines))
-    print(f"  Written: complexity_breakdown.md")
+    print("  Written: complexity_breakdown.md")
 
 
 # ---------------------------------------------------------------------------
@@ -305,7 +304,7 @@ def write_vuln_type_breakdown(
         lines.append("")
 
     (output_dir / "vuln_type_breakdown.md").write_text("\n".join(lines))
-    print(f"  Written: vuln_type_breakdown.md")
+    print("  Written: vuln_type_breakdown.md")
 
 
 # ---------------------------------------------------------------------------
@@ -342,7 +341,7 @@ def write_failure_stages(
         )
 
     (output_dir / "failure_stages.md").write_text("\n".join(lines) + "\n")
-    print(f"  Written: failure_stages.md")
+    print("  Written: failure_stages.md")
 
 
 # ---------------------------------------------------------------------------
@@ -410,7 +409,7 @@ def plot_pareto_frontier(
     fig.tight_layout()
     fig.savefig(output_dir / "pareto_frontier.png", dpi=150)
     plt.close(fig)
-    print(f"  Written: pareto_frontier.png")
+    print("  Written: pareto_frontier.png")
 
 
 # ---------------------------------------------------------------------------
@@ -462,7 +461,7 @@ def plot_token_distribution(
     fig.tight_layout()
     fig.savefig(output_dir / "token_distribution.png", dpi=150)
     plt.close(fig)
-    print(f"  Written: token_distribution.png")
+    print("  Written: token_distribution.png")
 
 
 # ---------------------------------------------------------------------------

@@ -1,8 +1,6 @@
 """
 LLM-as-Judge for evaluating patch correctness and quality.
 """
-import json
-from typing import Optional
 
 from pydantic import BaseModel, Field
 

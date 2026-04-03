@@ -19,7 +19,6 @@ from multi_agent_security.tools.code_parser import extract_repo_metadata
 from multi_agent_security.tools.static_analysis import run_dependency_audit, run_semgrep
 from multi_agent_security.tools.test_runner import run_tests_on_patched_code
 from multi_agent_security.types import (
-    AgentMessage,
     FixStrategy,
     ReviewResult,
     TaskState,

@@ -31,7 +31,6 @@ from multi_agent_security.types import (
 sys.path.insert(0, str(Path(__file__).parent))
 from generate_comparison import load_reports
 
-
 # ---------------------------------------------------------------------------
 # Loading helpers
 # ---------------------------------------------------------------------------
