@@ -202,6 +202,7 @@ class EvalResult(BaseModel):
     revision_loops: int
     failure_stage: Optional[str] = None  # "scanner", "triager", "patcher", "reviewer", None
     failure_reason: Optional[str] = None
+    test_passed: Optional[bool] = None   # True/False if tests were run; None if skipped
     vuln_type: Optional[str] = None       # for grouping in aggregate_metrics
     complexity_tag: Optional[str] = None  # for grouping in aggregate_metrics
 

@@ -230,6 +230,20 @@ class TestClassifyFailure:
         )
         assert category == FailureCategory.PATCHER_BREAKS_CODE
 
+    def test_patcher_breaks_code_via_eval_result(self):
+        """classify_failure uses eval_result.test_passed=False → PATCHER_BREAKS_CODE."""
+        example = _make_example()
+        result = _make_eval_result(
+            patch_correctness=0.1,
+            end_to_end_success=False,
+            test_passed=False,
+        )
+        patch = _make_patch()
+        state = _make_task_state(patches=[patch])
+        failures = self.clf.classify_failure(example, result, state)
+        categories = [f.failure_category for f in failures]
+        assert FailureCategory.PATCHER_BREAKS_CODE in categories
+
     def test_patcher_wrong_file(self):
         """Patch targets wrong file → PATCHER_WRONG_FILE."""
         clf = FailureClassifier()

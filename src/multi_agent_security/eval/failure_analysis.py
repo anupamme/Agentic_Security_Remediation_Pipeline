@@ -152,11 +152,21 @@ class FailureClassifier:
                 (r for r in reversed(task_state.reviews) if r.vuln_id == best_patch.vuln_id),
                 None,
             )
+            # Reconstruct a minimal TestResult from the stored test_passed outcome so
+            # that PATCHER_BREAKS_CODE can be identified when tests were actually run.
+            tr: Optional[TestResult] = None
+            if eval_result.test_passed is not None:
+                tr = TestResult(
+                    passed=eval_result.test_passed,
+                    output="",
+                    tests_run=0,
+                    tests_failed=0 if eval_result.test_passed else 1,
+                )
             category = self._classify_patch_failure(
                 patch=best_patch,
                 ground_truth_diff=example.ground_truth_diff,
                 review=review,
-                test_result=None,
+                test_result=tr,
             )
             failures.append(FailureAnalysis(
                 example_id=example.id,
