@@ -35,10 +35,11 @@ echo
 # ---------------------------------------------------------------------------
 echo "=== [3/6] Running dev-set smoke test (C1, C4, C7 × 1 run) ==="
 python scripts/run_full_benchmark.py \
+    --config config/arch_sequential.yaml \
     --split dev \
     --configs C1,C4,C7 \
     --runs 1 \
-    --output data/results/reproduce_smoke/
+    --output-dir data/results/reproduce_smoke/
 echo
 
 # ---------------------------------------------------------------------------
@@ -47,10 +48,11 @@ echo
 echo "=== [4/6] Running full benchmark (all 9 configs × 3 runs) ==="
 echo "    This step requires a valid ANTHROPIC_API_KEY and takes ~30–60 min."
 python scripts/run_full_benchmark.py \
+    --config config/arch_sequential.yaml \
     --split test \
     --runs 3 \
     --parallel 4 \
-    --output data/results/reproduce_full/
+    --output-dir data/results/reproduce_full/
 echo
 
 # ---------------------------------------------------------------------------
@@ -58,9 +60,10 @@ echo
 # ---------------------------------------------------------------------------
 echo "=== [5/6] Running ablation studies (FULL, A0–A4 × 3 runs) ==="
 python scripts/run_ablations.py \
+    --config config/arch_sequential.yaml \
     --split test \
     --runs 3 \
-    --output data/results/reproduce_ablations/
+    --output-dir data/results/reproduce_ablations/
 echo
 
 # ---------------------------------------------------------------------------
