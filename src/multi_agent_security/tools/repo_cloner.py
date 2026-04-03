@@ -67,6 +67,11 @@ class RepoCloner:
                 repo_url,
                 result.stderr.decode(errors="replace").strip(),
             )
+            # Remove any partial directory left by git so the next call doesn't
+            # mistake it for a successful cached clone.
+            if dest.exists():
+                import shutil
+                shutil.rmtree(dest, ignore_errors=True)
             return None
 
         if ref:

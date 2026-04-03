@@ -1,0 +1,15 @@
+{
+  "id": "fixture-001",
+  "repo_url": "/Users/admin/code/security/Multi_Agent_Security_Remediation_Pipeline/tests/fixtures/vulnerable_repo",
+  "repo_name": "vulnerable_repo",
+  "language": "python",
+  "vuln_type": "CWE-89",
+  "severity": "critical",
+  "complexity_tag": "low",
+  "ground_truth_diff": "--- a/app.py\n+++ b/app.py\n@@ -6,4 +6,4 @@\n     cursor = conn.cursor()\n-    cursor.execute(f\"SELECT * FROM users WHERE username = '{username}'\")\n+    cursor.execute(\"SELECT * FROM users WHERE username = ?\", (username,))\n     return cursor.fetchone()",
+  "vulnerable_files": [
+    "app.py"
+  ],
+  "negative": false,
+  "merge_status": "open"
+}

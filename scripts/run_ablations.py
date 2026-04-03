@@ -159,10 +159,20 @@ async def _eval_single_example(
     judge_score: Optional[float] = None
     patch_correctness = 0.0
     if result.patches and example.ground_truth_diff:
-        best_patch = result.patches[0]
+        # Prefer a patch whose file_path is in the ground-truth vulnerable files;
+        # fall back to the first patch if none match.
+        gt_files = {f.lstrip("./") for f in example.vulnerable_files}
+        best_patch = next(
+            (p for p in result.patches if p.file_path.lstrip("./") in gt_files),
+            result.patches[0],
+        )
+        # Also prefer the vuln for the same file when calling the judge.
+        vuln_for_judge = next(
+            (v for v in result.vulnerabilities if v.file_path.lstrip("./") in gt_files),
+            result.vulnerabilities[0] if result.vulnerabilities else None,
+        )
         try:
             judge = LLMJudge(llm_client)
-            vuln_for_judge = result.vulnerabilities[0] if result.vulnerabilities else None
             if vuln_for_judge:
                 js = await judge.judge_patch_correctness(
                     vulnerability=vuln_for_judge,
@@ -243,10 +253,17 @@ async def _eval_baseline_example(
     judge_score = None
     patch_correctness = 0.0
     if result.patches and example.ground_truth_diff:
-        best_patch = result.patches[0]
+        gt_files = {f.lstrip("./") for f in example.vulnerable_files}
+        best_patch = next(
+            (p for p in result.patches if p.file_path.lstrip("./") in gt_files),
+            result.patches[0],
+        )
+        vuln_for_judge = next(
+            (v for v in result.vulnerabilities if v.file_path.lstrip("./") in gt_files),
+            result.vulnerabilities[0] if result.vulnerabilities else None,
+        )
         try:
             judge = LLMJudge(llm_client)
-            vuln_for_judge = result.vulnerabilities[0] if result.vulnerabilities else None
             if vuln_for_judge:
                 js = await judge.judge_patch_correctness(
                     vulnerability=vuln_for_judge,
@@ -526,7 +543,15 @@ async def run_ablations(args) -> None:
     cloner = RepoCloner()
 
     async def _clone(ex: BenchmarkExample) -> tuple[str, Path | None]:
+        # If repo_url is an absolute path that already exists on disk, use it directly.
+        local = Path(ex.repo_url)
+        if local.is_absolute() and local.is_dir():
+            return ex.id, local
         path = await asyncio.to_thread(cloner.clone, ex.repo_url)
+        # Guard against partial clone dirs left by concurrent clone failures.
+        # A valid shallow clone has tracked files; failed clones have 0.
+        if path is not None and cloner.count_repo_files(path) == 0:
+            return ex.id, None
         return ex.id, path
 
     print(f"Cloning {len(examples)} repo(s)...")
